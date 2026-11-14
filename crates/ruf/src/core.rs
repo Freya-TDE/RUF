@@ -134,6 +134,8 @@ pub(crate) enum Notify {
     Drop(crate::canvas::DropEvent),
     /// Rechtsklick an dieser Stelle (relativ zum Widget).
     ContextMenu(i32, i32),
+    /// Ein Ziehen aus diesem Widget endete ohne Ablageziel.
+    DragCancelled,
 }
 
 type Callback<F> = Rc<RefCell<F>>;
@@ -158,6 +160,7 @@ enum Handler {
     Gutter(Callback<dyn FnMut(crate::code::GutterClick)>),
     Drop(Callback<dyn FnMut(crate::canvas::DropEvent)>),
     ContextMenu(Callback<dyn FnMut(i32, i32)>),
+    DragCancelled(Callback<dyn FnMut()>),
 }
 
 /// Ein Signal, das ein Widget anbieten kann.
@@ -181,6 +184,7 @@ pub(crate) enum Signal {
     Gutter,
     Drop,
     ContextMenu,
+    DragCancelled,
 }
 
 impl Signal {
@@ -206,8 +210,8 @@ impl Signal {
                 kind == K::TreeView
             }
             Signal::Gutter => kind == K::CodeEditor,
-            Signal::Drop => kind == K::Canvas,
-            Signal::ContextMenu => true,
+            Signal::Drop => matches!(kind, K::Canvas | K::Window | K::Container | K::TabView),
+            Signal::ContextMenu | Signal::DragCancelled => true,
         }
     }
 }
@@ -990,6 +994,13 @@ pub(crate) fn notify(id: Id, event: Notify) {
             }),
             |f| f(event.clone()),
         ),
+        Notify::DragCancelled => fire(
+            handlers(id, |h| match h {
+                Handler::DragCancelled(f) => Some(f.clone()),
+                _ => None,
+            }),
+            |f| f(),
+        ),
         Notify::ContextMenu(x, y) => fire(
             handlers(id, |h| match h {
                 Handler::ContextMenu(f) => Some(f.clone()),
@@ -1483,7 +1494,30 @@ pub(crate) fn connect_mouse(id: Id, f: impl FnMut(MouseEvent) + 'static) -> bool
 }
 
 pub(crate) fn connect_drop(id: Id, f: impl FnMut(crate::canvas::DropEvent) + 'static) -> bool {
-    add_handler(id, Signal::Drop, Handler::Drop(Rc::new(RefCell::new(f))))
+    let added = add_handler(id, Signal::Drop, Handler::Drop(Rc::new(RefCell::new(f))));
+    // Zeichenflächen nehmen immer an; andere Widgets einmal beim System anmelden.
+    let first = added
+        && get(id, |n| {
+            n.kind != WidgetKind::Canvas
+                && n.handlers
+                    .iter()
+                    .filter(|h| matches!(h, Handler::Drop(_)))
+                    .count()
+                    == 1
+        })
+        .unwrap_or(false);
+    if first && let Some((native, kind)) = native(id) {
+        setter(|| Platform::watch_drop(&native, kind));
+    }
+    added
+}
+
+pub(crate) fn connect_drag_cancelled(id: Id, f: impl FnMut() + 'static) -> bool {
+    add_handler(
+        id,
+        Signal::DragCancelled,
+        Handler::DragCancelled(Rc::new(RefCell::new(f))),
+    )
 }
 
 pub(crate) fn connect_key(id: Id, f: impl FnMut(KeyEvent) + 'static) -> bool {

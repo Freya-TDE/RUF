@@ -419,6 +419,10 @@ canvas.widget().on_drop(|e| match e.action {
     ruf::DropAction::Leave => { /* remove the mark */ }
     ruf::DropAction::Drop => println!("dropped: {:?} at {} {}", e.text, e.x, e.y),
 });
+// Dropping works on windows, panels and tab views too; dragged into the open reports:
+button.widget().on_drag_cancelled(|| println!("dragged next to every window"));
+// Right click on any widget (position for a context menu):
+button.widget().on_context_menu(|x, y| println!("right click at {x} {y}"));
 ```
 
 A click (or `canvas.widget().focus()`) gives the canvas keyboard focus.

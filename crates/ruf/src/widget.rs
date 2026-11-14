@@ -1026,10 +1026,22 @@ impl Widget {
         core::connect_clicked(self.id, f)
     }
 
-    /// Ziehen und Ablegen über einer Zeichenfläche (Text aus
-    /// [`Widget::set_drag_text`] oder einem anderen Programm).
+    /// Ziehen und Ablegen über einer Zeichenfläche, einem Fenster, Panel oder
+    /// einer Registerkarte (Text aus [`Widget::set_drag_text`] oder einem
+    /// anderen Programm).
     pub fn on_drop(&self, f: impl FnMut(crate::canvas::DropEvent) + 'static) -> bool {
         core::connect_drop(self.id, f)
+    }
+
+    /// Ein Ziehen aus diesem Widget ([`Widget::set_drag_text`]) endete ohne
+    /// Ablageziel, z. B. neben jedem Fenster.
+    pub fn on_drag_cancelled(&self, f: impl FnMut() + 'static) -> bool {
+        core::connect_drag_cancelled(self.id, f)
+    }
+
+    /// Simuliert ein Ziehen, das ohne Ablageziel endet (Tests).
+    pub fn simulate_drag_cancelled(&self) {
+        core::notify(self.id, core::Notify::DragCancelled);
     }
 
     /// Umschalten einer Checkbox oder eines Optionsfelds.

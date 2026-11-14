@@ -1105,7 +1105,11 @@ fn context_menu_signal() {
     let button = RnclButton::new(&window, "Knopf");
     let seen = std::rc::Rc::new(std::cell::Cell::new(None));
     let s = seen.clone();
-    assert!(button.widget().on_context_menu(move |x, y| s.set(Some((x, y)))));
+    assert!(
+        button
+            .widget()
+            .on_context_menu(move |x, y| s.set(Some((x, y))))
+    );
     button.widget().simulate_context_menu(5, 7);
     assert_eq!(seen.get(), Some((5, 7)));
     // Code-Editor: eigene Einträge, ohne Markierung kein Text.
@@ -1113,4 +1117,21 @@ fn context_menu_signal() {
     editor.set_text("fn main() {}");
     assert!(editor.set_extra_menu(&Menu::new().item("x.snippet", "Als Snippet speichern", None)));
     assert_eq!(editor.selected_text(), None);
+    // Ablegen auf einem Fenster, Ziehen ohne Ablageziel.
+    let dropped = std::rc::Rc::new(std::cell::RefCell::new(None));
+    let d = dropped.clone();
+    assert!(window.widget().on_drop(move |e| *d.borrow_mut() = e.text));
+    window.widget().simulate_drop(ruf::DropEvent {
+        action: ruf::DropAction::Drop,
+        x: 1,
+        y: 2,
+        text: Some("freya-view:x".into()),
+    });
+    assert_eq!(dropped.borrow().as_deref(), Some("freya-view:x"));
+    let cancelled = std::rc::Rc::new(std::cell::Cell::new(false));
+    let c = cancelled.clone();
+    button.widget().set_drag_text("freya-view:x");
+    assert!(button.widget().on_drag_cancelled(move || c.set(true)));
+    button.widget().simulate_drag_cancelled();
+    assert!(cancelled.get());
 }

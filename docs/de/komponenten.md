@@ -421,6 +421,10 @@ canvas.widget().on_drop(|e| match e.action {
     ruf::DropAction::Leave => { /* Marke entfernen */ }
     ruf::DropAction::Drop => println!("abgelegt: {:?} bei {} {}", e.text, e.x, e.y),
 });
+// Ablegen geht auch auf Fenstern, Panels und Registerkarten; ins Leere gezogen meldet:
+button.widget().on_drag_cancelled(|| println!("neben jedes Fenster gezogen"));
+// Rechtsklick auf ein beliebiges Widget (Position für ein Kontextmenü):
+button.widget().on_context_menu(|x, y| println!("Rechtsklick bei {x} {y}"));
 ```
 
 Ein Klick (oder `canvas.widget().focus()`) gibt der Zeichenfläche den
