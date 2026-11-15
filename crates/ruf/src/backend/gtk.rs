@@ -426,6 +426,7 @@ impl Suggest {
         popover.set_has_arrow(false);
         let button = gtk::MenuButton::new();
         button.set_popover(Some(&popover));
+        button.set_icon_name("pan-down-symbolic");
         button.set_focusable(false);
         let root = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         root.add_css_class("linked");
