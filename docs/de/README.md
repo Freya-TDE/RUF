@@ -68,5 +68,5 @@ RUF/
 │       ├── examples/          hello, counter, form, gallery, custom_component, designer
 │       └── tests/             Integrationstests gegen das echte Toolkit
 ├── docs/{de,en}/              diese Dokumentation
-└── .claude/skills/            Skills für KI-Assistenten
+└── .agents/skills/            Skills für KI-Assistenten
 ```

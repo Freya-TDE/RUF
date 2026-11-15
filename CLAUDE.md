@@ -49,5 +49,5 @@ RUF ist die Grundlage der Editor-Oberfläche des RAD-Tools
 - Rust ≥ 1.99, Edition 2024; `cargo clippy` warnungsfrei.
 - Entwickler-Dokumentation mit Beispielen auf Deutsch und Englisch, bei
   API-Änderungen beide pflegen.
-- Die Nutzung durch KI-Assistenten mitdenken: Skills in `.claude/skills/`.
+- Die Nutzung durch KI-Assistenten mitdenken: Skills in `.agents/skills/` (offener Standard Agent Skills, `SKILL.md`).
 - Lizenz: MIT OR Apache-2.0 (nach Wahl des Nutzers).

@@ -5,8 +5,9 @@ zuverlässig damit arbeiten können.
 
 ## Skills
 
-Unter `.claude/skills/` liegen Anleitungen, die Claude Code automatisch lädt, sobald
-eine passende Aufgabe ansteht:
+Unter `.agents/skills/` liegen Anleitungen im offenen Format *Agent Skills* (`SKILL.md` mit
+`name` und `description`). Freya TDE lädt sie in seine KI-Anbindung; andere Werkzeuge, die den
+Standard kennen (z. B. Codex, Gemini CLI), finden sie dort ebenfalls:
 
 | Skill | Wann |
 |---|---|
@@ -39,6 +40,6 @@ Andere KI-Werkzeuge finden dieselben Regeln kompakt in [`AGENTS.md`](../../AGENT
 
 ## Eigene Skills ergänzen
 
-Neue Skills als `.claude/skills/<name>/SKILL.md` mit YAML-Kopf (`name`, `description`)
+Neue Skills als `.agents/skills/<name>/SKILL.md` mit YAML-Kopf (`name`, `description`)
 anlegen. Die `description` entscheidet, wann der Skill geladen wird – also konkret
 beschreiben, *wann* er gebraucht wird.

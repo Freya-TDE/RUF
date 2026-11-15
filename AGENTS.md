@@ -1,7 +1,7 @@
 # AGENTS.md – Hinweise für KI-Assistenten
 
 Projektziel und Vorgaben: siehe `CLAUDE.md`. Ausführliche Anleitungen:
-`.claude/skills/{ruf-app,rncl-component,ruf-backend}/SKILL.md`.
+`.agents/skills/{ruf-app,rncl-component,ruf-backend}/SKILL.md`.
 
 ## Aufbau
 

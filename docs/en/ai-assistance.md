@@ -5,8 +5,9 @@ it reliably.
 
 ## Skills
 
-`.claude/skills/` contains guides that Claude Code loads automatically whenever a
-matching task comes up:
+`.agents/skills/` contains guides in the open *Agent Skills* format (`SKILL.md` with `name`
+and `description`). Freya TDE loads them into its AI integration; other tools that know the
+standard (e.g. Codex, Gemini CLI) find them there as well:
 
 | Skill | When |
 |---|---|
@@ -39,6 +40,6 @@ Other AI tools find the same rules in compact form in [`AGENTS.md`](../../AGENTS
 
 ## Adding your own skills
 
-Create new skills as `.claude/skills/<name>/SKILL.md` with a YAML header (`name`,
+Create new skills as `.agents/skills/<name>/SKILL.md` with a YAML header (`name`,
 `description`). The `description` decides when the skill gets loaded – so describe
 concretely *when* it is needed.

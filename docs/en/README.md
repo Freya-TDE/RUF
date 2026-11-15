@@ -68,7 +68,7 @@ RUF/
 │       ├── examples/          hello, counter, form, gallery, custom_component, designer
 │       └── tests/             integration tests against the real toolkit
 ├── docs/{de,en}/              this documentation
-└── .claude/skills/            skills for AI assistants
+└── .agents/skills/            skills for AI assistants
 ```
 
 > Note: doc comments and UI strings in the source code are written in German.

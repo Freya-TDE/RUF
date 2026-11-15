@@ -107,4 +107,4 @@ in the GTK backend, which runs on all systems:
 3. If the control needs new capabilities, extend the `Backend` trait.
 4. Then build the RNCL component as in option A, but with `Widget::create(WidgetKind::…)`.
 
-Step by step in the skill `.claude/skills/ruf-backend/SKILL.md`.
+Step by step in the skill `.agents/skills/ruf-backend/SKILL.md`.

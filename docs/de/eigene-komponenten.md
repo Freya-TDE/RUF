@@ -107,4 +107,4 @@ wird RUF selbst erweitert – im GTK-Backend, das auf allen Systemen läuft:
 3. Braucht das Steuerelement neue Fähigkeiten, den Trait `Backend` erweitern.
 4. Danach die RNCL-Komponente wie in Variante A, aber mit `Widget::create(WidgetKind::…)`.
 
-Schritt für Schritt im Skill `.claude/skills/ruf-backend/SKILL.md`.
+Schritt für Schritt im Skill `.agents/skills/ruf-backend/SKILL.md`.

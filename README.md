@@ -73,9 +73,9 @@ cargo run -p rncl --example hello      # weitere / more: counter, form, gallery,
 
 ## KI-Unterstützung / AI support
 
-Skills für Claude Code unter [`.claude/skills/`](.claude/skills), kompakte Regeln für andere Assistenten in
-[`AGENTS.md`](AGENTS.md). / Skills for Claude Code in [`.claude/skills/`](.claude/skills), compact rules for
-other assistants in [`AGENTS.md`](AGENTS.md).
+Skills im offenen Format Agent Skills unter [`.agents/skills/`](.agents/skills), kompakte Regeln in
+[`AGENTS.md`](AGENTS.md). / Skills in the open Agent Skills format in [`.agents/skills/`](.agents/skills),
+compact rules in [`AGENTS.md`](AGENTS.md).
 
 ## Lizenz / License
 
