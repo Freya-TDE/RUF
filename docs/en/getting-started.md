@@ -81,8 +81,8 @@ cargo new my_program && cd my_program
 ruf  = { version = "0.2.0" }   # the native foundation
 rncl = { version = "0.2.0" }   # the native system widgets
 # As long as the crates are unpublished, from the repository:
-# ruf  = { git = "https://github.com/Dragon-InterActive/RUF" }
-# rncl = { git = "https://github.com/Dragon-InterActive/RUF" }
+# ruf  = { git = "https://github.com/Freya-TDE/RUF" }
+# rncl = { git = "https://github.com/Freya-TDE/RUF" }
 ```
 
 `src/main.rs`:

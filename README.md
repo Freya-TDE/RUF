@@ -2,13 +2,13 @@
 
 **Deutsch:** Desktop-UI-Framework für Rust auf Basis von **GTK 4** – derselbe Code auf Linux, Windows und
 macOS. Releases für Windows und macOS liefern die GTK-Laufzeit mit (`tools/`, `docs/de/release.md`). RUF ist
-das Fundament des RAD-Tools [Freya TDE](https://github.com/Dragon-InterActive/Freya-TDE) und des
-[CT-Editors](https://github.com/Dragon-InterActive/CT-E).
+das Fundament des RAD-Tools [Freya TDE](https://github.com/Freya-TDE/Freya-TDE) und des
+[CT-Editors](https://github.com/Freya-TDE/CT-E).
 
 **English:** A desktop UI framework for Rust based on **GTK 4** – the same code on Linux, Windows and macOS.
 Releases for Windows and macOS ship the GTK runtime (`tools/`, `docs/en/release.md`). RUF is the foundation
-of the RAD tool [Freya TDE](https://github.com/Dragon-InterActive/Freya-TDE) and of the
-[CT-Editor](https://github.com/Dragon-InterActive/CT-E).
+of the RAD tool [Freya TDE](https://github.com/Freya-TDE/Freya-TDE) and of the
+[CT-Editor](https://github.com/Freya-TDE/CT-E).
 
 > **Mit Claude Code gebaut / Built with Claude Code** – RUF wurde vollständig mit
 > [Claude Code](https://claude.com/claude-code) (Modell Claude Opus 5.5) umgesetzt. / RUF was built entirely
@@ -25,8 +25,8 @@ Einbinden, solange RUF nicht auf crates.io steht / Until RUF is on crates.io:
 
 ```toml
 [dependencies]
-ruf  = { git = "https://github.com/Dragon-InterActive/RUF" }   # das Fundament / the foundation
-rncl = { git = "https://github.com/Dragon-InterActive/RUF" }   # die Komponenten / the components
+ruf  = { git = "https://github.com/Freya-TDE/RUF" }   # das Fundament / the foundation
+rncl = { git = "https://github.com/Freya-TDE/RUF" }   # die Komponenten / the components
 ```
 
 ## Beispiel / Example

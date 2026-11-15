@@ -15,8 +15,8 @@ Die UI-Elemente (Buttons, Textfelder, Checkboxen …) sind einzelne Komponenten 
 nach demselben Muster schreiben und im Framework registrieren.
 
 RUF ist die Grundlage der Editor-Oberfläche des RAD-Tools
-[Freya TDE](https://github.com/Dragon-InterActive/Freya-TDE) und des
-[CT-Editors](https://github.com/Dragon-InterActive/CT-E).
+[Freya TDE](https://github.com/Freya-TDE/Freya-TDE) und des
+[CT-Editors](https://github.com/Freya-TDE/CT-E).
 
 ## Entscheidungen
 
@@ -29,8 +29,8 @@ RUF ist die Grundlage der Editor-Oberfläche des RAD-Tools
 
   ```toml
   [dependencies]
-  ruf  = { git = "https://github.com/Dragon-InterActive/RUF" }   # das Fundament
-  rncl = { git = "https://github.com/Dragon-InterActive/RUF" }   # die Komponenten
+  ruf  = { git = "https://github.com/Freya-TDE/RUF" }   # das Fundament
+  rncl = { git = "https://github.com/Freya-TDE/RUF" }   # die Komponenten
   ```
 
   Zielbild nach einer Veröffentlichung: `ruf = "0.2"`, `rncl = "0.2"`.
