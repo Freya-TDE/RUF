@@ -1,5 +1,14 @@
 //! # RNCL – Rust native Component Library
 //!
+//! **English:** ready-made components for [RUF](ruf): plain Rust structs, each
+//! driving a real GTK 4 widget on Linux, Windows and macOS – window, panel,
+//! button, label, text field, check box, radio button, group box, text area,
+//! combo box, list, spin box, slider, progress bar, tabs, scroll area,
+//! canvas, tree view and a code editor (GtkSourceView). Start with
+//! `use rncl::prelude::*;` (see the example below and the repository's
+//! `examples/`).
+//!
+//! **Deutsch:**
 //! Die nativen System-Widgets für [RUF](ruf): pure Rust-Strukturen, die jeweils
 //! ein echtes GTK-4-Steuerelement steuern – auf Linux, Windows und macOS.
 //!

@@ -1,5 +1,16 @@
 //! # RUF – Rust native UI Framework
 //!
+//! **English:** the native foundation of the [RNCL](https://docs.rs/rncl)
+//! components and of the RAD tool *Freya TDE*. RUF drives **GTK 4 widgets**
+//! through a safe, pure Rust API on Linux, Windows and macOS (`gtk4-rs`):
+//! the same code for every system. Layers: the GTK 4 backend behind a trait,
+//! a platform-independent core (lifetime, signals, geometry, timers), and
+//! [`Widget`], [`Component`], [`ComponentRegistry`] with the property model,
+//! which RNCL and visual designers build on. Needs the GTK 4 (≥ 4.12) and
+//! GtkSourceView 5 libraries; Windows and macOS releases can ship them
+//! (see the repository's `tools/` and `docs/en/release.md`).
+//!
+//! **Deutsch:**
 //! Das native Fundament für [RNCL](https://docs.rs/rncl)-Komponenten und das
 //! RAD-Tool *Freya TDE*. RUF steuert **GTK-4-Steuerelemente** über eine
 //! sichere, pure Rust-API – auf Linux, Windows und macOS (`gtk4-rs`).

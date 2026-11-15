@@ -1,14 +1,19 @@
 [package]
 name = "rncl"
-description = "RNCL – Rust native Component Library: native System-Widgets (Button, Label, Textfeld, Checkbox …) auf Basis von RUF"
+description = "RNCL – Rust native Component Library: ready-made GTK 4 components (window, button, text field, list, tree, code editor …) built on RUF"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-keywords = ["gui", "qt", "widgets", "components", "rad"]
+readme = "README.md"
+documentation = "https://docs.rs/rncl"
+keywords = ["gui", "gtk", "widgets", "components", "rad"]
 categories = ["gui"]
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 ruf = { workspace = true }

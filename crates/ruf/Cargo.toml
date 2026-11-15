@@ -1,14 +1,20 @@
 [package]
 name = "ruf"
-description = "RUF – Rust native UI Framework: Oberflächen mit GTK 4 auf Linux, Windows und macOS – Fundament für RNCL-Komponenten und Freya TDE"
+description = "RUF – Rust native UI Framework: desktop UIs with GTK 4 on Linux, Windows and macOS; the foundation of the RNCL components and the Freya TDE IDE"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-keywords = ["gui", "native", "widgets", "ui", "rad"]
+readme = "README.md"
+documentation = "https://docs.rs/ruf"
+keywords = ["gui", "gtk", "native", "widgets", "rad"]
 categories = ["gui"]
+
+[package.metadata.docs.rs]
+# GTK 4 ist überall gleich; eine Plattform genügt. / One platform is enough.
+targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 regex = "1.13.1"
