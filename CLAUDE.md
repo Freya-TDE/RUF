@@ -25,15 +25,10 @@ RUF ist die Grundlage der Editor-Oberfläche des RAD-Tools
   Rust-Trait, damit ein anderes Toolkit später möglich wäre.
 - Abhängigkeiten: `gtk4` (Backend), `regex` (Syntax-Hervorhebung im Code-Editor).
   Weitere Crates nur in aktuellen, stabilen Versionen und mit freier Lizenz.
-- Einbindung in Projekte, solange RUF nicht auf crates.io veröffentlicht ist:
-
-  ```toml
-  [dependencies]
-  ruf  = { git = "https://github.com/Freya-TDE/RUF" }   # das Fundament
-  rncl = { git = "https://github.com/Freya-TDE/RUF" }   # die Komponenten
-  ```
-
-  Zielbild nach einer Veröffentlichung: `ruf = "0.2"`, `rncl = "0.2"`.
+- Veröffentlicht auf crates.io (seit 16.11.2026): `ruf = "0.2"`, `rncl = "0.2"`, API-Doku
+  auf docs.rs. Neue Version: Version im Workspace erhöhen, `cargo publish --workspace`,
+  dann den Tag `v<Version>` setzen und pushen (der Release-Workflow des CT-Editors holt
+  die Bundle-Skripte aus `tools/` über diesen Tag).
 
 ## Architektur
 

@@ -21,13 +21,15 @@ of the RAD tool [Freya TDE](https://github.com/Freya-TDE/Freya-TDE) and of the
 | [`ruf`](crates/ruf) | System-Ebene (GTK-4-Backend hinter dem Trait `Backend`), plattformunabhängiger Kern, `Widget`, `Component`, `ComponentRegistry`, Eigenschaftsmodell, Dialoge, Code-Editor-Funktionen | system layer (GTK 4 backend behind the `Backend` trait), platform-independent core, `Widget`, `Component`, `ComponentRegistry`, property model, dialogs, code editor functions |
 | [`rncl`](crates/rncl) | Rust native Component Library: Fenster, Container, Registerkarten, Scrollbereich, Knöpfe, Text-, Listen-, Baum- und Zahleneingaben, Code-Editor, Zeichenfläche, Fortschrittsanzeige | Rust native Component Library: window, container, tabs, scroll area, buttons, text, list, tree and number inputs, code editor, canvas, progress bar |
 
-Einbinden, solange RUF nicht auf crates.io steht / Until RUF is on crates.io:
+Einbinden von [crates.io](https://crates.io/crates/ruf) / From [crates.io](https://crates.io/crates/ruf):
 
 ```toml
 [dependencies]
-ruf  = { git = "https://github.com/Freya-TDE/RUF" }   # das Fundament / the foundation
-rncl = { git = "https://github.com/Freya-TDE/RUF" }   # die Komponenten / the components
+ruf  = "0.2"   # das Fundament / the foundation
+rncl = "0.2"   # die Komponenten / the components
 ```
+
+Doku der API / API docs: [docs.rs/ruf](https://docs.rs/ruf), [docs.rs/rncl](https://docs.rs/rncl).
 
 ## Beispiel / Example
 

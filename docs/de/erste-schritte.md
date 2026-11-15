@@ -81,9 +81,6 @@ cargo new mein_programm && cd mein_programm
 [dependencies]
 ruf  = { version = "0.2.0" }   # das native Fundament
 rncl = { version = "0.2.0" }   # die nativen System-Widgets
-# Solange die Crates nicht veröffentlicht sind, aus dem Repository:
-# ruf  = { git = "https://github.com/Freya-TDE/RUF" }
-# rncl = { git = "https://github.com/Freya-TDE/RUF" }
 ```
 
 `src/main.rs`:
