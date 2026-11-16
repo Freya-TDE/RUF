@@ -9,8 +9,8 @@ description: Eine Desktop-Anwendung oder ein Formular mit RUF und RNCL-Komponent
 
 ```toml
 [dependencies]
-ruf  = { version = "0.2.0" }
-rncl = { version = "0.2.0" }
+ruf  = { version = "0.2" }
+rncl = { version = "0.2" }
 ```
 
 RUF nutzt GTK 4 auf Linux, Windows und macOS (braucht `gtk4`-Entwicklungsdateien;

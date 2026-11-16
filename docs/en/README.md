@@ -10,8 +10,8 @@ RAD tool **Freya TDE**.
 
 ```toml
 [dependencies]
-ruf  = { version = "0.2.0" } # the foundation (GTK 4 on all systems)
-rncl = { version = "0.2.0" } # the native system widgets
+ruf  = { version = "0.2" } # the foundation (GTK 4 on all systems)
+rncl = { version = "0.2" } # the native system widgets
 ```
 
 ## Contents

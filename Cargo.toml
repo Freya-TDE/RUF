@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/ruf", "crates/rncl"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 authors = ["Dragon Software <info@dragon-software.net>"]
@@ -11,5 +11,5 @@ repository = "https://github.com/Freya-TDE/RUF"
 rust-version = "1.99"
 
 [workspace.dependencies]
-ruf = { path = "crates/ruf", version = "0.2.0" }
-rncl = { path = "crates/rncl", version = "0.2.0" }
+ruf = { path = "crates/ruf", version = "0.2.1" }
+rncl = { path = "crates/rncl", version = "0.2.1" }

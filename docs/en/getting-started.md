@@ -78,8 +78,8 @@ cargo new my_program && cd my_program
 
 ```toml
 [dependencies]
-ruf  = { version = "0.2.0" }   # the native foundation
-rncl = { version = "0.2.0" }   # the native system widgets
+ruf  = { version = "0.2" }   # the native foundation
+rncl = { version = "0.2" }   # the native system widgets
 ```
 
 `src/main.rs`:
