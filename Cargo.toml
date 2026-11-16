@@ -12,4 +12,3 @@ rust-version = "1.99"
 
 [workspace.dependencies]
 ruf = { path = "crates/ruf", version = "0.2.1" }
-rncl = { path = "crates/rncl", version = "0.2.1" }
