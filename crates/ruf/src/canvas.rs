@@ -83,18 +83,47 @@ pub struct Image {
     id: u64,
     bytes: std::sync::Arc<[u8]>,
     display: Option<crate::Size>,
+    /// Gamma und Deckkraft (siehe [`Image::with_tone`]).
+    tone: Option<(f32, f32)>,
+}
+
+fn next_image_id() -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
 impl Image {
     /// Ein Bild aus Dateidaten, z. B. `include_bytes!("logo.png")`.
     pub fn from_bytes(bytes: impl Into<std::sync::Arc<[u8]>>) -> Self {
-        use std::sync::atomic::{AtomicU64, Ordering};
-        static NEXT: AtomicU64 = AtomicU64::new(1);
         Self {
-            id: NEXT.fetch_add(1, Ordering::Relaxed),
+            id: next_image_id(),
             bytes: bytes.into(),
             display: None,
+            tone: None,
         }
+    }
+
+    /// Dasselbe Bild mit Gamma (1 = unverändert, über 1 heller, unter 1
+    /// dunkler; 0,1…5) und Deckkraft (0 = unsichtbar, 1 = deckend) auf der
+    /// Zeichenfläche. Beides wird beim Dekodieren einmal angewendet.
+    ///
+    /// *The same picture with gamma and opacity on the canvas.*
+    pub fn with_tone(&self, gamma: f32, opacity: f32) -> Self {
+        let gamma = gamma.clamp(0.1, 5.0);
+        let opacity = opacity.clamp(0.0, 1.0);
+        let neutral = (gamma - 1.0).abs() < f32::EPSILON && opacity >= 1.0;
+        Self {
+            id: if neutral { self.id } else { next_image_id() },
+            bytes: self.bytes.clone(),
+            display: self.display,
+            tone: (!neutral).then_some((gamma, opacity)),
+        }
+    }
+
+    /// Gamma und Deckkraft, falls gesetzt.
+    pub fn tone(&self) -> Option<(f32, f32)> {
+        self.tone
     }
 
     /// Anzeigegröße auf Knöpfen in logischen Pixeln, z. B. ein 48-px-Bild

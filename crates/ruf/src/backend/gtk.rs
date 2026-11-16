@@ -2469,12 +2469,12 @@ fn image_surface(image: &Image) -> Option<gtk::cairo::ImageSurface> {
         cache
             .borrow_mut()
             .entry(image.id())
-            .or_insert_with(|| decode_image(image.bytes()))
+            .or_insert_with(|| decode_image(image.bytes(), image.tone()))
             .clone()
     })
 }
 
-fn decode_image(bytes: &[u8]) -> Option<gtk::cairo::ImageSurface> {
+fn decode_image(bytes: &[u8], tone: Option<(f32, f32)>) -> Option<gtk::cairo::ImageSurface> {
     let texture = gdk::Texture::from_bytes(&glib::Bytes::from(bytes)).ok()?;
     let (w, h) = (texture.width(), texture.height());
     let mut surface = gtk::cairo::ImageSurface::create(gtk::cairo::Format::ARgb32, w, h).ok()?;
@@ -2484,9 +2484,33 @@ fn decode_image(bytes: &[u8]) -> Option<gtk::cairo::ImageSurface> {
         // Cairo ARGB32 = vormultipliziert, in Speicherreihenfolge BGRA auf
         // Little-Endian – genau das liefert `download`.
         texture.download(&mut data, stride);
+        if let Some((gamma, opacity)) = tone {
+            apply_tone(&mut data, gamma, opacity);
+        }
     }
     surface.mark_dirty();
     Some(surface)
+}
+
+/// Gamma und Deckkraft auf vormultiplizierte BGRA-Pixel (Cairo ARGB32).
+fn apply_tone(data: &mut [u8], gamma: f32, opacity: f32) {
+    let table: Vec<f32> = (0..=255u32)
+        .map(|c| (c as f32 / 255.0).powf(1.0 / gamma))
+        .collect();
+    for pixel in data.as_chunks_mut::<4>().0 {
+        let alpha = pixel[3];
+        if alpha == 0 {
+            continue;
+        }
+        let a = f32::from(alpha) / 255.0;
+        let new_alpha = a * opacity;
+        for channel in &mut pixel[..3] {
+            // Entmultiplizieren, Kurve, mit der neuen Deckkraft multiplizieren.
+            let straight = ((f32::from(*channel) / a).round() as usize).min(255);
+            *channel = (table[straight] * new_alpha * 255.0).round() as u8;
+        }
+        pixel[3] = (new_alpha * 255.0).round() as u8;
+    }
 }
 
 fn draw_image(cr: &gtk::cairo::Context, rect: Rect, image: &Image, fit: ImageFit) {
@@ -4028,4 +4052,33 @@ fn replace_word_before_cursor(view: &sourceview5::View, text: &str) {
     buffer.delete(&mut start, &mut end);
     buffer.insert(&mut start, text);
     buffer.end_user_action();
+}
+
+#[cfg(test)]
+mod tone_tests {
+    use super::apply_tone;
+
+    #[test]
+    fn gamma_and_opacity_on_premultiplied_pixels() {
+        // BGRA, vormultipliziert: Weiß deckend, Grau 64 deckend, durchsichtig.
+        let mut data = [255, 255, 255, 255, 64, 64, 64, 255, 0, 0, 0, 0];
+        apply_tone(&mut data, 1.0, 0.5);
+        assert_eq!(
+            &data[..4],
+            &[128, 128, 128, 128],
+            "halbe Deckkraft, vormultipliziert"
+        );
+        assert_eq!(
+            &data[8..],
+            &[0, 0, 0, 0],
+            "durchsichtig bleibt durchsichtig"
+        );
+        let mut grey = [64, 64, 64, 255];
+        apply_tone(&mut grey, 2.0, 1.0);
+        assert_eq!(
+            grey,
+            [128, 128, 128, 255],
+            "Gamma 2 hellt auf: (64/255)^0,5"
+        );
+    }
 }
