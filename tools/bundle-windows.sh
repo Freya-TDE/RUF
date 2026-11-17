@@ -28,7 +28,9 @@ mkdir -p "$dest/bin"
 cp "$exe" "$dest/bin/"
 
 # Alle DLLs, die aus dem MSYS2-Präfix stammen (rekursiv über ldd).
-ldd "$exe" | awk '{print $3}' | grep -i "^$prefix/bin/" | sort -u | while read -r dll; do
+# `|| true`: ein Programm ohne GTK (z. B. ein Helfer) braucht keine – dann fände grep
+# nichts und beendete wegen pipefail das ganze Skript.
+ldd "$exe" | awk '{print $3}' | { grep -i "^$prefix/bin/" || true; } | sort -u | while read -r dll; do
     cp -u "$dll" "$dest/bin/"
 done
 # gdbus wird von GLib für einige Dienste gestartet.
@@ -50,7 +52,7 @@ if [ -d "$prefix/lib/gdk-pixbuf-2.0" ]; then
     mkdir -p "$dest/lib"
     cp -r "$prefix/lib/gdk-pixbuf-2.0" "$dest/lib/"
     for loader in "$dest"/lib/gdk-pixbuf-2.0/2.10.0/loaders/*.dll; do
-        ldd "$loader" | awk '{print $3}' | grep -i "^$prefix/bin/" | while read -r dll; do
+        ldd "$loader" | awk '{print $3}' | { grep -i "^$prefix/bin/" || true; } | while read -r dll; do
             cp -u "$dll" "$dest/bin/"
         done
     done
