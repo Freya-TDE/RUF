@@ -79,8 +79,8 @@ cargo new mein_programm && cd mein_programm
 
 ```toml
 [dependencies]
-ruf  = { version = "0.2" }   # das native Fundament
-rncl = { version = "0.2" }   # die nativen System-Widgets
+ruf  = { version = "0.3" }   # das native Fundament
+rncl = { version = "0.3" }   # die nativen System-Widgets
 ```
 
 `src/main.rs`:

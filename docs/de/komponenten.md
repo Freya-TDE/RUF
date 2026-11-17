@@ -27,7 +27,7 @@ Einträge und Seitentitel).
 | Container | `RnclWindow`, `RnclPanel`, `RnclGroupBox`, `RnclTabView`, `RnclScrollView`, `RnclSplitter` |
 | Standard | `RnclButton`, `RnclLabel` |
 | Eingabe | `RnclTextField`, `RnclTextArea`, `RnclCheckBox`, `RnclRadioButton`, `RnclComboBox`, `RnclListBox`, `RnclSpinBox`, `RnclSlider` |
-| Anzeige | `RnclProgressBar` |
+| Anzeige | `RnclProgressBar`, `RnclImageBox`, `RnclImageScrollBox` |
 
 Jede Komponente hat zwei Konstruktoren: `new(&eltern, …)` und
 `with_parent(Option<&Widget>, …)` (für Registry-Fabriken und zusammengesetzte Komponenten).
@@ -353,6 +353,63 @@ bar.set_busy(true);                                // "beschäftigt" ohne Prozen
 |---|---|---|
 | `value` / `minimum` / `maximum` | Int | Wert und Bereich |
 | `vertical` | Bool | senkrechte Ausrichtung |
+
+## `RnclImageBox` – Bild
+
+Nativ: GTK `GtkPicture` · Kategorie *Anzeige* · Standardgröße 96×96
+
+```rust
+let photo = RnclImageBox::new(&window);
+photo.set_geometry(10, 10, 200, 150);
+photo.set_file("photo.png")?;                       // oder set_image(Some(&image))
+photo.set_fit(ImageFit::Cover);                     // Contain (Standard), Cover, Stretch, Center
+photo.set_gamma(1.4);                               // 1 = unverändert, darüber heller (0,1…5)
+photo.set_opacity(0.8);                             // 0 = unsichtbar, 1 = deckend
+photo.on_clicked(|| println!("Bild angeklickt"));
+```
+
+Formate nach den Bildladern des Systems (PNG, JPEG, meist auch GIF, WebP, TIFF).
+Gamma und Deckkraft wirken über [`Image::with_tone`](https://docs.rs/ruf/latest/ruf/struct.Image.html#method.with_tone)
+und werden einmal beim Dekodieren angewendet. `Widget::click()` löst einen Klick per Code aus.
+
+| Eigenschaft | Typ | |
+|---|---|---|
+| `file` | Text | Bilddatei (leer = kein Bild; eine fehlende Datei lässt das Bild leer) |
+| `fit` | Text | `Contain`, `Cover`, `Stretch` oder `Center` (sonst `PropertyError::InvalidValue`) |
+| `gamma` | Int | Gamma in Hundertsteln (100 = 1,0; 10…500) |
+| `opacity` | Int | Deckkraft in Prozent (0…100) |
+
+## `RnclImageScrollBox` – Bildergalerie
+
+Nativ: GTK `GtkFlowBox` in `GtkScrolledWindow` · Kategorie *Anzeige* · Standardgröße
+240×128, Raster, Vorschau 96×96, Abstand 8, Einpassung `Cover`
+
+Die Fortsetzung der ImageBox für mehrere Bilder: eine Zeile (`Horizontal`), eine Spalte
+(`Vertical`) oder ein umbrechendes Raster (`Grid`), ein Klick wählt ein Bild.
+
+```rust
+let gallery = RnclImageScrollBox::new(&window);
+gallery.set_geometry(10, 170, 320, 200);
+gallery.set_layout(GalleryLayout::Horizontal);
+gallery.set_thumb_size(64, 64);
+let failed = gallery.set_files(&["a.png", "b.png", "c.png"]); // nicht lesbare Pfade
+let g = gallery.clone();
+gallery.on_current_index_changed(move |i| println!("{i}: {:?}", g.current_file()));
+```
+
+Eine Datei, die sich nicht lesen lässt, bleibt als leerer Platz stehen, damit die
+Indizes zu den Pfaden passen. Neue Bilder heben die Auswahl auf.
+Auf Widget-Ebene: `WidgetKind::ImageGallery` mit `set_images`, `set_gallery(Gallery { layout, thumb, spacing })`,
+`set_image_fit`, `current_index`, `on_current_index_changed`.
+
+| Eigenschaft | Typ | |
+|---|---|---|
+| `images` | Liste | Bilddateien |
+| `layout` | Text | `Horizontal`, `Vertical` oder `Grid` |
+| `thumb_width` / `thumb_height` | Int | Größe der Vorschaubilder |
+| `spacing` | Int | Abstand zwischen den Bildern |
+| `current_index` | Int | ausgewähltes Bild (`-1` = keins) |
+| `fit` / `gamma` / `opacity` | Text / Int / Int | wie bei `RnclImageBox` |
 
 ## `RnclTabView` – Registerkarten
 

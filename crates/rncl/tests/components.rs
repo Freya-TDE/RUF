@@ -51,6 +51,8 @@ fn main() {
         ("code_editor", code_editor),
         ("code_editor_debugging", code_editor_debugging),
         ("image_icon_and_splash_window", image_icon_and_splash_window),
+        ("image_box", image_box),
+        ("image_scroll_box", image_scroll_box),
     ];
 
     for (name, test) in tests {
@@ -189,7 +191,7 @@ fn properties() {
 
 fn registry_create() {
     let registry = rncl::registry();
-    assert_eq!(registry.len(), 20);
+    assert_eq!(registry.len(), 22);
     assert!(registry.categories().contains(&"Container"));
 
     let window = registry.create("RnclWindow", None).unwrap();
@@ -456,6 +458,8 @@ fn kinds_and_classes() {
         ("RnclProgressBar", WidgetKind::ProgressBar),
         ("RnclTabView", WidgetKind::TabView),
         ("RnclScrollView", WidgetKind::ScrollArea),
+        ("RnclImageBox", WidgetKind::Image),
+        ("RnclImageScrollBox", WidgetKind::ImageGallery),
     ];
     for (type_name, kind) in expected {
         let c = registry.create(type_name, Some(window.widget())).unwrap();
@@ -1134,4 +1138,108 @@ fn context_menu_signal() {
     assert!(button.widget().on_drag_cancelled(move || c.set(true)));
     button.widget().simulate_drag_cancelled();
     assert!(cancelled.get());
+}
+
+/// Die Test-PNG als Datei (für `set_file`).
+fn png_file(name: &str) -> std::path::PathBuf {
+    let path = std::env::temp_dir().join(format!("rncl-{}-{name}", std::process::id()));
+    std::fs::write(&path, include_bytes!("red-4x2.png")).unwrap();
+    path
+}
+
+fn image_box() {
+    let window = RnclWindow::new("t");
+    let mut photo = RnclImageBox::new(&window);
+    assert_eq!(photo.size(), Size::new(96, 96));
+    assert_eq!(photo.fit(), ImageFit::Contain);
+
+    let file = png_file("photo.png");
+    photo.set_file(&file).unwrap();
+    assert_eq!(photo.file(), file.display().to_string());
+    assert_eq!(photo.image().and_then(|i| i.size()), Some(Size::new(4, 2)));
+    // Gamma und Deckkraft gehen als getöntes Bild ans Widget.
+    photo.set_gamma(1.5);
+    photo.set_opacity(0.5);
+    assert_eq!(
+        photo.widget().image().and_then(|i| i.tone()),
+        Some((1.5, 0.5))
+    );
+    assert!(photo.set_file("/gibt/es/nicht.png").is_err());
+    assert!(photo.image().is_none());
+
+    // Eigenschaften (Gamma in Hundertsteln, Deckkraft in Prozent).
+    photo
+        .set_property("file", file.display().to_string().into())
+        .unwrap();
+    photo
+        .set_property("fit", "Cover".to_owned().into())
+        .unwrap();
+    photo.set_property("gamma", 200.into()).unwrap();
+    photo.set_property("opacity", 80.into()).unwrap();
+    assert_eq!(photo.fit(), ImageFit::Cover);
+    assert_eq!(photo.property("gamma"), Some(200.into()));
+    assert_eq!(photo.property("opacity"), Some(80.into()));
+    assert!(matches!(
+        photo.set_property("fit", "Zoom".to_owned().into()),
+        Err(PropertyError::InvalidValue { .. })
+    ));
+
+    let clicks = Rc::new(Cell::new(0));
+    let c = clicks.clone();
+    photo.on_clicked(move || c.set(c.get() + 1));
+    assert!(photo.widget().click());
+    assert_eq!(clicks.get(), 1);
+    window.show();
+    Application::process_events();
+    let _ = std::fs::remove_file(file);
+}
+
+fn image_scroll_box() {
+    let window = RnclWindow::new("t");
+    let mut gallery = RnclImageScrollBox::new(&window);
+    assert_eq!(gallery.layout(), GalleryLayout::Grid);
+    assert_eq!(gallery.thumb_size(), Size::new(96, 96));
+
+    let a = png_file("a.png");
+    let b = png_file("b.png");
+    let failed = gallery.set_files(&[a.as_path(), std::path::Path::new("/fehlt.png"), b.as_path()]);
+    assert_eq!(failed, ["/fehlt.png"]);
+    assert_eq!(gallery.count(), 3);
+    assert_eq!(gallery.current_index(), -1);
+
+    let selected = Rc::new(Cell::new(-2));
+    let s = selected.clone();
+    gallery.on_current_index_changed(move |index| s.set(index));
+    gallery.set_current_index(2);
+    assert_eq!(selected.get(), 2);
+    assert_eq!(gallery.current_file(), Some(b.display().to_string()));
+    gallery.set_current_index(-1);
+    assert_eq!(selected.get(), -1);
+
+    gallery
+        .set_property("layout", "Horizontal".to_owned().into())
+        .unwrap();
+    gallery.set_property("thumb_width", 48.into()).unwrap();
+    gallery.set_property("spacing", 4.into()).unwrap();
+    assert_eq!(gallery.layout(), GalleryLayout::Horizontal);
+    assert_eq!(gallery.thumb_size(), Size::new(48, 96));
+    assert_eq!(gallery.spacing(), 4);
+    assert!(
+        gallery
+            .set_property("layout", "Kreis".to_owned().into())
+            .is_err()
+    );
+    // Neue Bilder heben die Auswahl auf.
+    gallery.set_current_index(0);
+    gallery.set_files(&[a.as_path()]);
+    assert_eq!(gallery.current_index(), -1);
+    assert_eq!(
+        gallery.property("images"),
+        Some(vec![a.display().to_string()].into())
+    );
+    window.show();
+    Application::process_events();
+    for f in [a, b] {
+        let _ = std::fs::remove_file(f);
+    }
 }

@@ -10,8 +10,8 @@ eigenständige, austauschbare Komponenten. Beide bilden die Basis des RAD-Tools
 
 ```toml
 [dependencies]
-ruf  = { version = "0.2" } # Das Fundament (GTK 4 auf allen Systemen)
-rncl = { version = "0.2" } # Die nativen System-Widgets
+ruf  = { version = "0.3" } # Das Fundament (GTK 4 auf allen Systemen)
+rncl = { version = "0.3" } # Die nativen System-Widgets
 ```
 
 ## Inhalt

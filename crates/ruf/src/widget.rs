@@ -472,7 +472,7 @@ impl Widget {
     }
 
     /// Löst einen Klick aus wie per Maus (inkl. Umschalten und aller Signale).
-    /// Liefert `false`, wenn das Widget kein Button ist.
+    /// Liefert `false`, wenn das Widget weder Button noch Bild ist.
     pub fn click(&self) -> bool {
         core::click(self.id)
     }
@@ -613,9 +613,10 @@ impl Widget {
     pub fn current_index(&self) -> i32 {
         core::native(self.id)
             .map(|(n, k)| match k {
-                WidgetKind::ComboBox | WidgetKind::ListBox | WidgetKind::TabView => {
-                    Platform::current_index(&n, k)
-                }
+                WidgetKind::ComboBox
+                | WidgetKind::ListBox
+                | WidgetKind::TabView
+                | WidgetKind::ImageGallery => Platform::current_index(&n, k),
                 _ => -1,
             })
             .unwrap_or(-1)
@@ -751,10 +752,40 @@ impl Widget {
         core::get(self.id, |n| n.execution_line).flatten()
     }
 
-    /// Bild auf einem Knopf (links vom Text; ohne Text nur das Bild).
-    /// `None` entfernt es.
+    /// Bild auf einem Knopf (links vom Text; ohne Text nur das Bild) bzw.
+    /// eines Bild-Widgets ([`WidgetKind::Image`], Gamma und Deckkraft über
+    /// [`crate::Image::with_tone`]). `None` entfernt es.
     pub fn set_image(&self, image: Option<&crate::Image>) {
         core::set_image(self.id, image.cloned());
+    }
+
+    /// Bilder einer Galerie ([`WidgetKind::ImageGallery`]); hebt die Auswahl
+    /// auf. Die Auswahl liefert [`Widget::current_index`] und
+    /// [`Widget::on_current_index_changed`].
+    pub fn set_images(&self, images: &[crate::Image]) {
+        core::set_images(self.id, images.to_vec());
+    }
+
+    pub fn images(&self) -> Vec<crate::Image> {
+        core::get(self.id, |n| n.images.clone()).unwrap_or_default()
+    }
+
+    /// Wie Bilder in ihren Platz kommen (Bild-Widget, Galerie).
+    pub fn set_image_fit(&self, fit: crate::ImageFit) {
+        core::set_image_fit(self.id, fit);
+    }
+
+    pub fn image_fit(&self) -> crate::ImageFit {
+        core::get(self.id, |n| n.fit).unwrap_or_default()
+    }
+
+    /// Anordnung, Vorschaugröße und Abstand einer Galerie.
+    pub fn set_gallery(&self, gallery: crate::Gallery) {
+        core::set_gallery(self.id, gallery);
+    }
+
+    pub fn gallery(&self) -> crate::Gallery {
+        core::get(self.id, |n| n.gallery).unwrap_or_default()
     }
 
     pub fn image(&self) -> Option<crate::Image> {

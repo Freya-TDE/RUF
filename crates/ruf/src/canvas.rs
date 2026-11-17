@@ -75,6 +75,38 @@ pub enum ImageFit {
     Center,
 }
 
+/// Anordnung der Bilder einer Galerie ([`crate::WidgetKind::ImageGallery`]).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum GalleryLayout {
+    /// Eine Zeile, waagerecht scrollbar.
+    Horizontal,
+    /// Eine Spalte, senkrecht scrollbar.
+    Vertical,
+    /// Raster, das umbricht (senkrecht scrollbar).
+    #[default]
+    Grid,
+}
+
+/// Anordnung, Vorschaugröße und Abstand einer Galerie.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Gallery {
+    pub layout: GalleryLayout,
+    /// Größe jedes Vorschaubilds in Pixeln.
+    pub thumb: crate::Size,
+    /// Abstand zwischen den Bildern in Pixeln.
+    pub spacing: i32,
+}
+
+impl Default for Gallery {
+    fn default() -> Self {
+        Self {
+            layout: GalleryLayout::Grid,
+            thumb: crate::Size::new(96, 96),
+            spacing: 8,
+        }
+    }
+}
+
 /// Ein Bild für [`Shape::Image`]: PNG oder JPEG (SVG nur, wenn das System
 /// einen Lader dafür hat). Klone teilen die Daten; das Backend dekodiert
 /// jedes Bild nur einmal.
@@ -114,7 +146,13 @@ impl Image {
         let opacity = opacity.clamp(0.0, 1.0);
         let neutral = (gamma - 1.0).abs() < f32::EPSILON && opacity >= 1.0;
         Self {
-            id: if neutral { self.id } else { next_image_id() },
+            // Neue Kennung, sobald sich das Aussehen ändert (der Zwischenspeicher
+            // des Backends hängt an ihr), also auch beim Zurücksetzen.
+            id: if neutral && self.tone.is_none() {
+                self.id
+            } else {
+                next_image_id()
+            },
             bytes: self.bytes.clone(),
             display: self.display,
             tone: (!neutral).then_some((gamma, opacity)),
@@ -235,4 +273,23 @@ pub struct KeyEvent {
 pub fn measure_text(text: &str, size: i32, bold: bool, monospace: bool) -> crate::Size {
     use crate::backend::{Backend, Platform};
     Platform::measure_text(text, size, bold, monospace)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Image;
+
+    #[test]
+    fn tone_changes_the_cache_id() {
+        let plain = Image::from_bytes(&b"x"[..]);
+        // Ohne Änderung dieselbe Kennung, mit Ton eine neue.
+        assert_eq!(plain.with_tone(1.0, 1.0).id(), plain.id());
+        let toned = plain.with_tone(2.0, 0.5);
+        assert_ne!(toned.id(), plain.id());
+        assert_eq!(toned.tone(), Some((2.0, 0.5)));
+        // Zurücksetzen ist ebenfalls eine Änderung.
+        let reset = toned.with_tone(1.0, 1.0);
+        assert_eq!(reset.tone(), None);
+        assert_ne!(reset.id(), toned.id());
+    }
 }

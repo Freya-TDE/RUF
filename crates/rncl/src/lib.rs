@@ -33,6 +33,8 @@
 //! | [`RnclCanvas`] | `GtkDrawingArea` | nein |
 //! | [`RnclTreeView`] | `GtkListBox` (eingerückt) | nein |
 //! | [`RnclCodeEditor`] | `GtkSourceView` | nein |
+//! | [`RnclImageBox`] | `GtkPicture` | nein |
+//! | [`RnclImageScrollBox`] | `GtkFlowBox` im `GtkScrolledWindow` | nein |
 //!
 //! ```no_run
 //! use rncl::prelude::*;
@@ -63,6 +65,8 @@ mod checkbox;
 mod code_editor;
 mod combo_box;
 mod group_box;
+mod image_box;
+mod image_scroll_box;
 mod label;
 mod list_box;
 mod panel;
@@ -85,6 +89,8 @@ pub use checkbox::RnclCheckBox;
 pub use code_editor::RnclCodeEditor;
 pub use combo_box::RnclComboBox;
 pub use group_box::RnclGroupBox;
+pub use image_box::RnclImageBox;
+pub use image_scroll_box::RnclImageScrollBox;
 pub use label::RnclLabel;
 pub use list_box::RnclListBox;
 pub use panel::RnclPanel;
@@ -126,6 +132,8 @@ pub fn register_all(registry: &mut ComponentRegistry) -> Result<(), RegistryErro
     registry.register(RnclTreeView::info())?;
     registry.register(RnclCodeEditor::info())?;
     registry.register(RnclSplitter::info())?;
+    registry.register(RnclImageBox::info())?;
+    registry.register(RnclImageScrollBox::info())?;
     Ok(())
 }
 
@@ -140,14 +148,14 @@ pub fn registry() -> ComponentRegistry {
 pub mod prelude {
     pub use crate::{
         RnclButton, RnclCanvas, RnclCheckBox, RnclCodeEditor, RnclComboBox, RnclGroupBox,
-        RnclLabel, RnclListBox, RnclPanel, RnclProgressBar, RnclRadioButton, RnclScrollView,
-        RnclSlider, RnclSpinBox, RnclSplitter, RnclTabView, RnclTextArea, RnclTextField,
-        RnclTreeView, RnclWindow,
+        RnclImageBox, RnclImageScrollBox, RnclLabel, RnclListBox, RnclPanel, RnclProgressBar,
+        RnclRadioButton, RnclScrollView, RnclSlider, RnclSpinBox, RnclSplitter, RnclTabView,
+        RnclTextArea, RnclTextField, RnclTreeView, RnclWindow,
     };
     pub use ruf::prelude::*;
     pub use ruf::{
-        BreakpointKind, BreakpointMark, Completion, DiffKind, DiffMark, Elide, Fold, GutterClick,
-        KeyEvent, LineMark, MarkKind, Menu, MenuBar, Modifiers, MouseAction, MouseEvent, Shape,
-        TreeItem,
+        BreakpointKind, BreakpointMark, Completion, DiffKind, DiffMark, Elide, Fold, Gallery,
+        GalleryLayout, GutterClick, Image, ImageFit, KeyEvent, LineMark, MarkKind, Menu, MenuBar,
+        Modifiers, MouseAction, MouseEvent, Shape, TreeItem,
     };
 }

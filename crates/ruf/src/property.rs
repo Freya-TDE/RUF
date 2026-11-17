@@ -170,12 +170,27 @@ pub enum PropertyError {
     },
     /// Die Eigenschaft kann nicht geschrieben werden.
     ReadOnly { name: String },
+    /// Der Wert hat den richtigen Typ, ist aber nicht erlaubt (z. B. ein
+    /// unbekannter Aufzählungswert); `allowed` nennt die erlaubten Werte.
+    InvalidValue {
+        name: String,
+        value: String,
+        allowed: Vec<String>,
+    },
 }
 
 impl PropertyError {
     pub fn unknown(name: &str) -> Self {
         Self::Unknown {
             name: name.to_owned(),
+        }
+    }
+
+    pub fn invalid_value(name: &str, value: &str, allowed: &[&str]) -> Self {
+        Self::InvalidValue {
+            name: name.to_owned(),
+            value: value.to_owned(),
+            allowed: allowed.iter().map(|a| (*a).to_owned()).collect(),
         }
     }
 
@@ -201,6 +216,15 @@ impl fmt::Display for PropertyError {
                 "Eigenschaft `{name}` erwartet `{expected}`, erhalten `{found}`"
             ),
             Self::ReadOnly { name } => write!(f, "Eigenschaft `{name}` ist schreibgeschützt"),
+            Self::InvalidValue {
+                name,
+                value,
+                allowed,
+            } => write!(
+                f,
+                "Eigenschaft `{name}`: `{value}` ist nicht erlaubt (erlaubt: {})",
+                allowed.join(", ")
+            ),
         }
     }
 }

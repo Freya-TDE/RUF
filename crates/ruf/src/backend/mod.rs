@@ -252,6 +252,10 @@ pub(crate) trait Backend {
     fn set_execution_line(native: &Self::Native, line: Option<usize>);
     /// Bild eines Knopfs (links vom Text); `None` entfernt es.
     fn set_button_image(native: &Self::Native, image: Option<&Image>);
+    /// Bild eines Bild-Widgets (höchstens eins) bzw. Bilder einer Galerie.
+    fn set_pictures(native: &Self::Native, kind: WidgetKind, images: &[Image]);
+    fn set_image_fit(native: &Self::Native, kind: WidgetKind, fit: crate::ImageFit);
+    fn set_gallery(native: &Self::Native, gallery: crate::Gallery);
     /// Faltbare Bereiche mit Zustand (siehe [`crate::code::fold_regions`]).
     fn folds(native: &Self::Native) -> Vec<Fold>;
     /// Faltet den Bereich, der in `line` (ab 1) beginnt, bzw. klappt ihn auf.

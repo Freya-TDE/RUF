@@ -136,6 +136,34 @@ fn main() {
     }
     volume.set_value(40);
 
+    // --- Seite 3: Bilder --------------------------------------------------
+    let pictures = tabs.add_tab("Bilder");
+    let red = Image::from_bytes(&include_bytes!("../tests/red-4x2.png")[..]);
+    let photo = RnclImageBox::new(&pictures);
+    photo.set_geometry(10, 10, 160, 120);
+    photo.set_image(Some(&red));
+    let picked = RnclLabel::new(&pictures, "Bild anklicken");
+    picked.set_geometry(190, 10, 330, 24);
+    {
+        let picked = picked.clone();
+        photo.on_clicked(move || picked.set_text("ImageBox angeklickt"));
+    }
+    // Dasselbe Bild mit verschiedener Deckkraft: zeigt Gamma und Transparenz.
+    let gallery = RnclImageScrollBox::new(&pictures);
+    gallery.set_geometry(10, 140, 510, 180);
+    gallery.set_thumb_size(64, 48);
+    let tones: Vec<Image> = [1.0, 0.75, 0.5, 0.25]
+        .iter()
+        .flat_map(|o| [red.with_tone(1.0, *o), red.with_tone(2.5, *o)])
+        .collect();
+    gallery.set_images(&tones);
+    {
+        let picked = picked.clone();
+        gallery.on_current_index_changed(move |index| {
+            picked.set_text(&format!("Galerie: Bild {index}"));
+        });
+    }
+
     window.show();
 
     let args: Vec<String> = std::env::args().collect();
@@ -147,7 +175,14 @@ fn main() {
         Application::process_events();
         let second = path.replace(".png", "-werte.png");
         let ok2 = window.widget().save_screenshot(&second);
-        println!("Screenshots {path}, {second}: {}", ok && ok2);
+        tabs.set_current_index(2);
+        Application::process_events();
+        let third = path.replace(".png", "-bilder.png");
+        let ok3 = window.widget().save_screenshot(&third);
+        println!(
+            "Screenshots {path}, {second}, {third}: {}",
+            ok && ok2 && ok3
+        );
         return;
     }
 

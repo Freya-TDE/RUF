@@ -25,8 +25,8 @@ Einbinden von [crates.io](https://crates.io/crates/ruf) / From [crates.io](https
 
 ```toml
 [dependencies]
-ruf  = "0.2"   # das Fundament / the foundation
-rncl = "0.2"   # die Komponenten / the components
+ruf  = "0.3"   # das Fundament / the foundation
+rncl = "0.3"   # die Komponenten / the components
 ```
 
 Doku der API / API docs: [docs.rs/ruf](https://docs.rs/ruf), [docs.rs/rncl](https://docs.rs/rncl).

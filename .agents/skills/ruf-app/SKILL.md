@@ -60,6 +60,8 @@ fn main() {
 | `RnclSlider` | `new(&parent)` | `set_range`, `set_value`, `set_vertical`, `on_value_changed` (Standard 0…99) |
 | `RnclProgressBar` | `new(&parent)` | `set_value`, `set_range`, `set_busy` (Standard 0…100) |
 | `RnclScrollView` | `new(&parent)` | Kinder in `content()`, `set_content_size(0, höhe)` |
+| `RnclImageBox` | `new(&parent)` | `set_file(path) -> io::Result`, `set_image`, `set_fit(ImageFit)`, `set_gamma`, `set_opacity`, `on_clicked` (Standard 96×96) |
+| `RnclImageScrollBox` | `new(&parent)` | `set_files(&[..]) -> Vec<nicht lesbar>`, `set_images`, `set_layout(GalleryLayout)`, `set_thumb_size`, `set_spacing`, `current_index`, `current_file`, `on_current_index_changed` |
 
 Alle (Trait `Component`, kommt mit der prelude): `set_position`, `set_size`,
 `set_geometry`, `show`, `hide`, `set_enabled`, `set_tool_tip`, `set_style_sheet`,

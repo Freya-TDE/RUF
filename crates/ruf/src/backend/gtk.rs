@@ -214,6 +214,20 @@ pub enum Inner {
     },
     Tree(gtk::ListBox),
     Code(sourceview5::View),
+    Picture(gtk::Picture),
+    Gallery {
+        flow: gtk::FlowBox,
+        scroll: gtk::ScrolledWindow,
+        state: Rc<RefCell<GalleryState>>,
+    },
+}
+
+/// Was eine Galerie zeigt; bei jeder Änderung werden die Bilder neu gebaut.
+#[derive(Default)]
+pub struct GalleryState {
+    images: Vec<Image>,
+    fit: ImageFit,
+    gallery: crate::Gallery,
 }
 
 #[derive(Default)]
@@ -1023,6 +1037,37 @@ impl Backend for Gtk {
                 list.add_controller(click);
                 (scroll.upcast(), None, Inner::Tree(list))
             }
+            WidgetKind::Image => {
+                let picture = gtk::Picture::new();
+                picture.set_can_shrink(true);
+                picture.set_content_fit(gtk::ContentFit::Contain);
+                let click = gtk::GestureClick::new();
+                click.connect_released(move |_, _, _, _| notify(id, Notify::Clicked));
+                picture.add_controller(click);
+                (picture.clone().upcast(), None, Inner::Picture(picture))
+            }
+            WidgetKind::ImageGallery => {
+                let flow = gtk::FlowBox::new();
+                flow.set_selection_mode(gtk::SelectionMode::Single);
+                flow.set_homogeneous(true);
+                flow.set_valign(gtk::Align::Start);
+                flow.set_halign(gtk::Align::Start);
+                flow.connect_selected_children_changed(move |_| notify(id, Notify::Changed));
+                let scroll = gtk::ScrolledWindow::new();
+                scroll.set_child(Some(&flow));
+                scroll.set_has_frame(true);
+                let state = Rc::new(RefCell::new(GalleryState::default()));
+                fill_gallery(&flow, &scroll, &state.borrow());
+                (
+                    scroll.clone().upcast(),
+                    None,
+                    Inner::Gallery {
+                        flow,
+                        scroll,
+                        state,
+                    },
+                )
+            }
             WidgetKind::ListBox => {
                 let list = gtk::ListBox::new();
                 list.set_selection_mode(gtk::SelectionMode::Single);
@@ -1586,6 +1631,10 @@ impl Backend for Gtk {
                 _ => list.unselect_all(),
             },
             Inner::Tabs(n) => n.set_current_page(u32::try_from(index).ok()),
+            Inner::Gallery { flow, .. } => match flow.child_at_index(index) {
+                Some(child) if index >= 0 => flow.select_child(&child),
+                _ => flow.unselect_all(),
+            },
             _ => {}
         }
     }
@@ -1601,6 +1650,11 @@ impl Backend for Gtk {
                 list.selected_row().map(|r| r.index()).unwrap_or(-1)
             }
             Inner::Tabs(n) => n.current_page().map(|i| i as i32).unwrap_or(-1),
+            Inner::Gallery { flow, .. } => flow
+                .selected_children()
+                .first()
+                .map(|c| c.index())
+                .unwrap_or(-1),
             _ => -1,
         }
     }
@@ -1912,6 +1966,51 @@ impl Backend for Gtk {
         row.append(&picture);
         row.append(&label);
         button.set_child(Some(&row));
+    }
+
+    fn set_pictures(native: &GtkNative, _kind: WidgetKind, images: &[Image]) {
+        match &native.inner {
+            Inner::Picture(picture) => {
+                let texture = images.first().and_then(image_texture);
+                picture.set_paintable(texture.as_ref());
+            }
+            Inner::Gallery {
+                flow,
+                scroll,
+                state,
+            } => {
+                state.borrow_mut().images = images.to_vec();
+                fill_gallery(flow, scroll, &state.borrow());
+            }
+            _ => {}
+        }
+    }
+
+    fn set_image_fit(native: &GtkNative, _kind: WidgetKind, fit: ImageFit) {
+        match &native.inner {
+            Inner::Picture(picture) => picture.set_content_fit(content_fit(fit)),
+            Inner::Gallery {
+                flow,
+                scroll,
+                state,
+            } => {
+                state.borrow_mut().fit = fit;
+                fill_gallery(flow, scroll, &state.borrow());
+            }
+            _ => {}
+        }
+    }
+
+    fn set_gallery(native: &GtkNative, gallery: crate::Gallery) {
+        if let Inner::Gallery {
+            flow,
+            scroll,
+            state,
+        } = &native.inner
+        {
+            state.borrow_mut().gallery = gallery;
+            fill_gallery(flow, scroll, &state.borrow());
+        }
     }
 
     fn set_execution_line(native: &GtkNative, line: Option<usize>) {
@@ -2452,9 +2551,80 @@ fn image_texture(image: &Image) -> Option<gdk::Texture> {
         cache
             .borrow_mut()
             .entry(image.id())
-            .or_insert_with(|| gdk::Texture::from_bytes(&glib::Bytes::from(image.bytes())).ok())
+            .or_insert_with(|| match image.tone() {
+                None => gdk::Texture::from_bytes(&glib::Bytes::from(image.bytes())).ok(),
+                // Gamma und Deckkraft: aus der getönten Cairo-Fläche.
+                Some(_) => toned_texture(&image_surface(image)?),
+            })
             .clone()
     })
+}
+
+/// Eine Cairo-Fläche (ARGB32, vormultipliziert) als GDK-Textur.
+fn toned_texture(surface: &gtk::cairo::ImageSurface) -> Option<gdk::Texture> {
+    let (w, h, stride) = (surface.width(), surface.height(), surface.stride());
+    let mut copy = None;
+    surface
+        .with_data(|data| copy = Some(glib::Bytes::from(data)))
+        .ok()?;
+    let bytes = copy?;
+    let format = if cfg!(target_endian = "little") {
+        gdk::MemoryFormat::B8g8r8a8Premultiplied
+    } else {
+        gdk::MemoryFormat::A8r8g8b8Premultiplied
+    };
+    Some(gdk::MemoryTexture::new(w, h, format, &bytes, usize::try_from(stride).ok()?).upcast())
+}
+
+fn content_fit(fit: ImageFit) -> gtk::ContentFit {
+    match fit {
+        ImageFit::Contain => gtk::ContentFit::Contain,
+        ImageFit::Cover => gtk::ContentFit::Cover,
+        ImageFit::Stretch => gtk::ContentFit::Fill,
+        ImageFit::Center => gtk::ContentFit::ScaleDown,
+    }
+}
+
+/// Baut die Bilder einer Galerie nach `state` neu (Auswahl aufgehoben).
+fn fill_gallery(flow: &gtk::FlowBox, scroll: &gtk::ScrolledWindow, state: &GalleryState) {
+    use crate::GalleryLayout;
+    let g = state.gallery;
+    let (orientation, per_line, policy) = match g.layout {
+        // Eine Zeile: senkrecht ausgerichtete Box mit einem Bild je „Zeile“.
+        GalleryLayout::Horizontal => (
+            gtk::Orientation::Vertical,
+            1,
+            (gtk::PolicyType::Automatic, gtk::PolicyType::Never),
+        ),
+        GalleryLayout::Vertical => (
+            gtk::Orientation::Horizontal,
+            1,
+            (gtk::PolicyType::Never, gtk::PolicyType::Automatic),
+        ),
+        GalleryLayout::Grid => (
+            gtk::Orientation::Horizontal,
+            1000,
+            (gtk::PolicyType::Never, gtk::PolicyType::Automatic),
+        ),
+    };
+    flow.set_orientation(orientation);
+    flow.set_min_children_per_line(1);
+    flow.set_max_children_per_line(per_line);
+    let spacing = u32::try_from(g.spacing).unwrap_or(0);
+    flow.set_row_spacing(spacing);
+    flow.set_column_spacing(spacing);
+    scroll.set_policy(policy.0, policy.1);
+    flow.remove_all();
+    for image in &state.images {
+        let picture = gtk::Picture::new();
+        picture.set_paintable(image_texture(image).as_ref());
+        picture.set_content_fit(content_fit(state.fit));
+        picture.set_can_shrink(true);
+        picture.set_size_request(g.thumb.width.max(1), g.thumb.height.max(1));
+        let child = gtk::FlowBoxChild::new();
+        child.set_child(Some(&picture));
+        flow.append(&child);
+    }
 }
 
 thread_local! {

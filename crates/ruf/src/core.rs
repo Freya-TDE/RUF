@@ -73,6 +73,11 @@ pub enum WidgetKind {
     TreeView = 17,
     /// Code-Editor: Hervorhebung, Zeilennummern, Marken am Rand.
     CodeEditor = 18,
+    /// Ein Bild mit Einpassung ([`crate::ImageFit`]); meldet Klicks.
+    Image = 19,
+    /// Bildergalerie in einem Scrollbereich: Zeile, Spalte oder Raster,
+    /// ein Bild ist auswählbar.
+    ImageGallery = 20,
 }
 
 impl WidgetKind {
@@ -192,7 +197,8 @@ impl Signal {
     pub(crate) fn supported_by(self, kind: WidgetKind) -> bool {
         use WidgetKind as K;
         match self {
-            Signal::Clicked | Signal::Toggled => kind.is_checkable(),
+            Signal::Clicked => kind.is_checkable() || kind == K::Image,
+            Signal::Toggled => kind.is_checkable(),
             Signal::TextChanged => {
                 matches!(
                     kind,
@@ -201,7 +207,12 @@ impl Signal {
             }
             Signal::ReturnPressed => kind == K::LineEdit,
             Signal::ValueChanged => kind.has_range(),
-            Signal::IndexChanged => matches!(kind, K::ComboBox | K::ListBox | K::TabView),
+            Signal::IndexChanged => {
+                matches!(
+                    kind,
+                    K::ComboBox | K::ListBox | K::TabView | K::ImageGallery
+                )
+            }
             Signal::Resized | Signal::CloseRequested => true,
             Signal::Mouse => matches!(kind, K::Canvas | K::CodeEditor | K::TreeView),
             Signal::Key | Signal::TextInput => kind == K::Canvas,
@@ -274,8 +285,14 @@ pub(crate) struct Node {
     pub breakpoint_marks: Vec<crate::code::BreakpointMark>,
     /// Zeile (ab 1), an der der Debugger steht.
     pub execution_line: Option<usize>,
-    /// Bild eines Knopfs.
+    /// Bild eines Knopfs bzw. eines Bild-Widgets.
     pub image: Option<crate::Image>,
+    /// Bilder einer Galerie.
+    pub images: Vec<crate::Image>,
+    /// Einpassung der Bilder (Bild-Widget, Galerie).
+    pub fit: crate::ImageFit,
+    /// Anordnung, Vorschaugröße und Abstand einer Galerie.
+    pub gallery: crate::Gallery,
     /// Verankerung und die Lage, für die sie gilt (eigenes Rechteck und
     /// Größe des Elternelements beim Setzen).
     pub anchors: crate::Anchors,
@@ -459,6 +476,9 @@ fn new_node(kind: WidgetKind, native: Native, parent: Option<Id>, geometry: Rect
         breakpoint_marks: Vec::new(),
         execution_line: None,
         image: None,
+        images: Vec::new(),
+        fit: crate::ImageFit::default(),
+        gallery: crate::Gallery::default(),
         anchors: crate::Anchors::TOP_LEFT,
         anchor_base: None,
         last: Snapshot {
@@ -862,7 +882,10 @@ pub(crate) fn sync(id: Id) -> bool {
                 text = Some(now);
             }
         }
-        WidgetKind::ComboBox | WidgetKind::ListBox | WidgetKind::TabView => {
+        WidgetKind::ComboBox
+        | WidgetKind::ListBox
+        | WidgetKind::TabView
+        | WidgetKind::ImageGallery => {
             let now = Platform::current_index(&native, kind);
             if update(id, |n| std::mem::replace(&mut n.last.index, now) != now) == Some(true) {
                 index = Some(now);
@@ -1090,7 +1113,7 @@ pub(crate) fn click(id: Id) -> bool {
     let Some((native, kind, enabled)) = get(id, |n| (n.native.clone(), n.kind, n.enabled)) else {
         return false;
     };
-    if !kind.is_checkable() {
+    if !kind.is_checkable() && kind != WidgetKind::Image {
         return false;
     }
     if !enabled {
@@ -1139,7 +1162,11 @@ fn set_combo_text(id: Id, text: &str) {
 
 pub(crate) fn set_current_index(id: Id, index: i32) {
     let Some((native, kind, count)) = get(id, |n| {
-        (n.native.clone(), n.kind, n.items.len().max(n.tabs.len()))
+        (
+            n.native.clone(),
+            n.kind,
+            n.items.len().max(n.tabs.len()).max(n.images.len()),
+        )
     }) else {
         return;
     };
@@ -1778,11 +1805,43 @@ pub(crate) fn set_breakpoint_marks(id: Id, marks: Vec<crate::code::BreakpointMar
 }
 
 pub(crate) fn set_image(id: Id, image: Option<crate::Image>) {
-    let Some((native, WidgetKind::PushButton)) = native(id) else {
+    match native(id) {
+        Some((native, WidgetKind::PushButton)) => {
+            setter(|| Platform::set_button_image(&native, image.as_ref()));
+        }
+        Some((native, kind @ WidgetKind::Image)) => {
+            let images: Vec<crate::Image> = image.iter().cloned().collect();
+            setter(|| Platform::set_pictures(&native, kind, &images));
+        }
+        _ => return,
+    }
+    update(id, |n| n.image = image);
+}
+
+/// Bilder einer Galerie; die Auswahl wird aufgehoben.
+pub(crate) fn set_images(id: Id, images: Vec<crate::Image>) {
+    let Some((native, kind @ WidgetKind::ImageGallery)) = native(id) else {
         return;
     };
-    setter(|| Platform::set_button_image(&native, image.as_ref()));
-    update(id, |n| n.image = image);
+    update(id, |n| n.images = images.clone());
+    setter(|| Platform::set_pictures(&native, kind, &images));
+    sync(id);
+}
+
+pub(crate) fn set_image_fit(id: Id, fit: crate::ImageFit) {
+    let Some((native, kind @ (WidgetKind::Image | WidgetKind::ImageGallery))) = native(id) else {
+        return;
+    };
+    update(id, |n| n.fit = fit);
+    setter(|| Platform::set_image_fit(&native, kind, fit));
+}
+
+pub(crate) fn set_gallery(id: Id, gallery: crate::Gallery) {
+    let Some((native, WidgetKind::ImageGallery)) = native(id) else {
+        return;
+    };
+    update(id, |n| n.gallery = gallery);
+    setter(|| Platform::set_gallery(&native, gallery));
 }
 
 pub(crate) fn set_execution_line(id: Id, line: Option<usize>) {
