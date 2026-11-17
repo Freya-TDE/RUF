@@ -582,6 +582,17 @@ impl Backend for Gtk {
     }
 
     fn init() {
+        // Ohne `GtkApplication` setzt niemand den Programmnamen: das Fenster
+        // hätte kein WM_CLASS (X11) bzw. keine App-ID (Wayland), Taskleiste
+        // und Startmenü fänden die `.desktop`-Datei nicht. RUF nimmt den Namen
+        // der ausführbaren Datei (`ct-editor` → `ct-editor.desktop`).
+        if glib::prgname().is_none()
+            && let Some(name) = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+        {
+            glib::set_prgname(Some(name.as_str()));
+        }
         if let Err(e) = gtk::init() {
             panic!(
                 "ruf: GTK konnte nicht initialisiert werden ({e}). Läuft eine grafische \

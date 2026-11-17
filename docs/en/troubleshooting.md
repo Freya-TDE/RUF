@@ -24,6 +24,7 @@
 | `ruf: Panik in einem Callback abgefangen: …` | panic inside a closure | fix the closure; the application keeps running |
 | `Gdk-CRITICAL: gdk_surface_thaw_updates: assertion …` (macOS) | bug in GTK's macOS backend when opening drop-down lists (also in `gtk4-demo`) | harmless; RUF hides the message on macOS |
 | `Gtk-WARNING: GtkGizmo … (slider) reported min width -2` | bug in KDE's Breeze GTK theme (scroll bars) | harmless; RUF hides the message |
+| task bar/start menu show a foreign icon or do not match the window to its launcher (Linux) | window class (X11 `WM_CLASS`) or app id (Wayland) does not match the `.desktop` file | since 0.3.1 RUF uses the executable's name (`my-program` → `my-program.desktop`); name the `.desktop` file accordingly and add `StartupWMClass=my-program` |
 
 ## Tests
 
