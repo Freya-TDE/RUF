@@ -79,8 +79,13 @@ impl RnclComboBox {
     }
 
     /// Wählt den Eintrag mit diesem Text aus (bzw. setzt den Text, wenn editierbar).
+    /// Derselbe Text ändert nichts: so bleibt der Cursor einer editierbaren
+    /// Liste stehen, auch wenn ein Handler bei jeder Eingabe neu setzt (unter
+    /// Windows sprang er sonst an den Anfang).
     pub fn set_current_text(&self, text: &str) {
-        self.widget.set_text(text);
+        if self.current_text() != text {
+            self.widget.set_text(text);
+        }
     }
 
     /// Erlaubt zusätzlich freie Texteingabe.

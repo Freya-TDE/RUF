@@ -1327,8 +1327,14 @@ impl Backend for Gtk {
         let source = gtk::DragSource::new();
         source.set_actions(gdk::DragAction::COPY);
         let text = text.to_owned();
+        // Eigener Typ statt Text: andere Programme (Desktop, Explorer, Chat)
+        // kennen ihn nicht und lehnen das Ablegen ab. Sonst macht z. B. der
+        // Plasma-Desktop aus dem Text eine Notiz, und „ins Leere gezogen“
+        // (eigenes Fenster) greift nicht.
         source.connect_prepare(move |_, _, _| {
-            Some(gdk::ContentProvider::for_value(&text.to_value()))
+            Some(gdk::ContentProvider::for_value(
+                &DragText(text.clone()).to_value(),
+            ))
         });
         // Ins Leere abgelegt (neben jedes Fenster): melden.
         source.connect_drag_cancel(move |_, _, reason| {
@@ -1337,11 +1343,13 @@ impl Backend for Gtk {
             }
             false
         });
-        // Das Widget selbst als Bild unter der Maus.
+        // Ein Standbild des Widgets unter der Maus. Kein lebendes
+        // `WidgetPaintable`: unter Windows 11 blieben dessen Bilder nach dem
+        // Ziehen als Fenster stehen.
         source.connect_drag_begin(|source, _| {
             if let Some(w) = source.widget() {
-                let paintable = gtk::WidgetPaintable::new(Some(&w));
-                source.set_icon(Some(&paintable), w.width() / 2, w.height() / 2);
+                let image = gtk::WidgetPaintable::new(Some(&w)).current_image();
+                source.set_icon(Some(&image), w.width() / 2, w.height() / 2);
             }
         });
         widget.add_controller(source);
@@ -2927,10 +2935,26 @@ fn key_from(keyval: gdk::Key) -> Option<Key> {
     })
 }
 
+/// Inhalt eines Ziehens aus einem Widget mit `set_drag_text` (nur innerhalb
+/// des Programms bekannt, siehe dort).
+#[derive(Clone, Debug, glib::Boxed)]
+#[boxed_type(name = "RufDragText")]
+struct DragText(String);
+
+/// Text eines Ziehens: eigener Typ oder Text aus einem anderen Programm.
+fn drop_text(value: &glib::Value) -> Option<String> {
+    value
+        .get::<DragText>()
+        .map(|d| d.0)
+        .ok()
+        .or_else(|| value.get::<String>().ok())
+}
+
 /// Ein Ablageziel für Text (Ziehen aus einem Widget mit `set_drag_text` oder
 /// einem anderen Programm); meldet Bewegung, Verlassen und Ablegen.
 fn drop_target(id: Id) -> gtk::DropTarget {
-    let target = gtk::DropTarget::new(glib::Type::STRING, gdk::DragAction::COPY);
+    let target = gtk::DropTarget::new(glib::Type::INVALID, gdk::DragAction::COPY);
+    target.set_types(&[DragText::static_type(), glib::Type::STRING]);
     target.set_preload(true);
     let dropped = move |action, x: f64, y: f64, text: Option<String>| {
         notify(
@@ -2944,7 +2968,7 @@ fn drop_target(id: Id) -> gtk::DropTarget {
         );
     };
     target.connect_motion(move |t, x, y| {
-        let text = t.value().and_then(|v| v.get::<String>().ok());
+        let text = t.value().as_ref().and_then(drop_text);
         dropped(crate::canvas::DropAction::Motion, x, y, text);
         gdk::DragAction::COPY
     });
@@ -2954,7 +2978,7 @@ fn drop_target(id: Id) -> gtk::DropTarget {
             crate::canvas::DropAction::Drop,
             x,
             y,
-            value.get::<String>().ok(),
+            drop_text(value),
         );
         true
     });
