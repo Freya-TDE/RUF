@@ -93,6 +93,18 @@ impl RnclTabView {
         self.widget.current_index()
     }
 
+    /// Reiter mit „x“ zum Schließen (auch Mittelklick); `f` bekommt den Index
+    /// und entscheidet selbst, ob die Seite geht ([`RnclTabView::remove_tab`]).
+    pub fn on_tab_close_requested(&self, f: impl FnMut(i32) + 'static) {
+        self.widget.on_tab_close_requested(f);
+    }
+
+    /// Reiter lassen sich ins Leere ziehen; `f` bekommt den Index der Seite
+    /// (z. B. um ihren Inhalt in ein eigenes Fenster zu holen).
+    pub fn on_tab_detach_requested(&self, f: impl FnMut(i32) + 'static) {
+        self.widget.on_tab_detach_requested(f);
+    }
+
     /// Wird beim Seitenwechsel mit dem neuen Index aufgerufen.
     pub fn on_current_index_changed(&self, f: impl FnMut(i32) + 'static) {
         self.widget.on_current_index_changed(f);

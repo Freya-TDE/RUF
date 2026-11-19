@@ -141,6 +141,10 @@ pub(crate) enum Notify {
     ContextMenu(i32, i32),
     /// Ein Ziehen aus diesem Widget endete ohne Ablageziel.
     DragCancelled,
+    /// Registerkarte: Schließen der Seite `n` gewünscht („x“ oder Mittelklick).
+    TabClose(i32),
+    /// Registerkarte: Seite `n` wurde aus der Leiste ins Leere gezogen.
+    TabDetach(i32),
 }
 
 type Callback<F> = Rc<RefCell<F>>;
@@ -166,6 +170,8 @@ enum Handler {
     Drop(Callback<dyn FnMut(crate::canvas::DropEvent)>),
     ContextMenu(Callback<dyn FnMut(i32, i32)>),
     DragCancelled(Callback<dyn FnMut()>),
+    TabClose(Callback<dyn FnMut(i32)>),
+    TabDetach(Callback<dyn FnMut(i32)>),
 }
 
 /// Ein Signal, das ein Widget anbieten kann.
@@ -190,6 +196,8 @@ pub(crate) enum Signal {
     Drop,
     ContextMenu,
     DragCancelled,
+    TabClose,
+    TabDetach,
 }
 
 impl Signal {
@@ -223,6 +231,7 @@ impl Signal {
             Signal::Gutter => kind == K::CodeEditor,
             Signal::Drop => matches!(kind, K::Canvas | K::Window | K::Container | K::TabView),
             Signal::ContextMenu | Signal::DragCancelled => true,
+            Signal::TabClose | Signal::TabDetach => kind == K::TabView,
         }
     }
 }
@@ -1024,6 +1033,20 @@ pub(crate) fn notify(id: Id, event: Notify) {
             }),
             |f| f(),
         ),
+        Notify::TabClose(index) => fire(
+            handlers(id, |h| match h {
+                Handler::TabClose(f) => Some(f.clone()),
+                _ => None,
+            }),
+            |f| f(index),
+        ),
+        Notify::TabDetach(index) => fire(
+            handlers(id, |h| match h {
+                Handler::TabDetach(f) => Some(f.clone()),
+                _ => None,
+            }),
+            |f| f(index),
+        ),
         Notify::ContextMenu(x, y) => fire(
             handlers(id, |h| match h {
                 Handler::ContextMenu(f) => Some(f.clone()),
@@ -1535,6 +1558,32 @@ pub(crate) fn connect_drop(id: Id, f: impl FnMut(crate::canvas::DropEvent) + 'st
         .unwrap_or(false);
     if first && let Some((native, kind)) = native(id) {
         setter(|| Platform::watch_drop(&native, kind));
+    }
+    added
+}
+
+/// Registerkarte: Schließen einer Seite gewünscht; schaltet die „x“-Knöpfe ein.
+pub(crate) fn connect_tab_close(id: Id, f: impl FnMut(i32) + 'static) -> bool {
+    let added = add_handler(
+        id,
+        Signal::TabClose,
+        Handler::TabClose(Rc::new(RefCell::new(f))),
+    );
+    if added && let Some((native, _)) = native(id) {
+        setter(|| Platform::tabs_set_closable(&native, true));
+    }
+    added
+}
+
+/// Registerkarte: Seite ins Leere gezogen; macht die Reiter ziehbar.
+pub(crate) fn connect_tab_detach(id: Id, f: impl FnMut(i32) + 'static) -> bool {
+    let added = add_handler(
+        id,
+        Signal::TabDetach,
+        Handler::TabDetach(Rc::new(RefCell::new(f))),
+    );
+    if added && let Some((native, _)) = native(id) {
+        setter(|| Platform::tabs_set_detachable(&native, true));
     }
     added
 }

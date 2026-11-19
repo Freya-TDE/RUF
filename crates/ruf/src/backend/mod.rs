@@ -168,6 +168,11 @@ pub(crate) trait Backend {
     fn tab_add(native: &Self::Native, page_id: Id, title: &str) -> Self::Native;
     fn tab_remove(native: &Self::Native, index: i32);
     fn tab_set_title(native: &Self::Native, index: i32, title: &str);
+    /// Reiter mit „x“ (und Mittelklick) zum Schließen, gemeldet als
+    /// `Notify::TabClose`.
+    fn tabs_set_closable(native: &Self::Native, closable: bool);
+    /// Reiter lassen sich ins Leere ziehen, gemeldet als `Notify::TabDetach`.
+    fn tabs_set_detachable(native: &Self::Native, detachable: bool);
 
     // --- Wertebereich (Spinbox, Schieberegler, Fortschritt) ----------------------
 

@@ -1070,6 +1070,30 @@ impl Widget {
         core::connect_drag_cancelled(self.id, f)
     }
 
+    /// Registerkarte: der Anwender will die Seite mit diesem Index schließen
+    /// („x“ am Reiter oder Mittelklick). Schaltet die „x“-Knöpfe ein; ob die
+    /// Seite wirklich geht (z. B. nach Rückfrage), entscheidet der Aufrufer.
+    pub fn on_tab_close_requested(&self, f: impl FnMut(i32) + 'static) -> bool {
+        core::connect_tab_close(self.id, f)
+    }
+
+    /// Registerkarte: die Seite mit diesem Index wurde aus der Reiterleiste
+    /// ins Leere gezogen (z. B. um sie als eigenes Fenster zu zeigen). Macht
+    /// die Reiter ziehbar.
+    pub fn on_tab_detach_requested(&self, f: impl FnMut(i32) + 'static) -> bool {
+        core::connect_tab_detach(self.id, f)
+    }
+
+    /// Simuliert „x“ bzw. Mittelklick am Reiter `index` (Tests).
+    pub fn simulate_tab_close(&self, index: i32) {
+        core::notify(self.id, core::Notify::TabClose(index));
+    }
+
+    /// Simuliert das Herausziehen des Reiters `index` (Tests).
+    pub fn simulate_tab_detach(&self, index: i32) {
+        core::notify(self.id, core::Notify::TabDetach(index));
+    }
+
     /// Simuliert ein Ziehen, das ohne Ablageziel endet (Tests).
     pub fn simulate_drag_cancelled(&self) {
         core::notify(self.id, core::Notify::DragCancelled);

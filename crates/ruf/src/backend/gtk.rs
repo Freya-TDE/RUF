@@ -1713,7 +1713,8 @@ impl Backend for Gtk {
     fn tab_add(native: &GtkNative, page_id: Id, title: &str) -> GtkNative {
         let page = RufFixed::new(page_id);
         if let Inner::Tabs(n) = &native.inner {
-            n.append_page(&page, Some(&gtk::Label::new(Some(title))));
+            let tab = tab_label(n, native.id, page.upcast_ref(), title);
+            n.append_page(&page, Some(&tab));
         }
         GtkNative {
             id: page_id,
@@ -1740,13 +1741,42 @@ impl Backend for Gtk {
         // das Label-Widget. Liegt der Mauszeiger gerade darauf, verschickt GTK
         // danach Ereignisse an das freigegebene Label (Absturz unter macOS in
         // `gtk_synthesize_crossing_events`), und der Reiter springt beim Klicken.
-        match n.tab_label(&page).and_downcast::<gtk::Label>() {
+        let label = n.tab_label(&page).and_then(|tab| {
+            tab.clone()
+                .downcast::<gtk::Label>()
+                .ok()
+                .or_else(|| tab.first_child().and_downcast::<gtk::Label>())
+        });
+        match label {
             Some(label) => {
                 if label.text() != title {
                     label.set_text(title);
                 }
             }
             None => n.set_tab_label_text(&page, title),
+        }
+    }
+
+    fn tabs_set_closable(native: &GtkNative, closable: bool) {
+        let Inner::Tabs(n) = &native.inner else {
+            return;
+        };
+        set_class(n.upcast_ref(), TABS_CLOSABLE, closable);
+        for i in 0..n.n_pages() {
+            if let Some(button) = n
+                .nth_page(Some(i))
+                .and_then(|p| n.tab_label(&p))
+                .and_then(|tab| tab.last_child())
+                .and_downcast::<gtk::Button>()
+            {
+                button.set_visible(closable);
+            }
+        }
+    }
+
+    fn tabs_set_detachable(native: &GtkNative, detachable: bool) {
+        if let Inner::Tabs(n) = &native.inner {
+            set_class(n.upcast_ref(), TABS_DETACHABLE, detachable);
         }
     }
 
@@ -2935,6 +2965,88 @@ fn key_from(keyval: gdk::Key) -> Option<Key> {
     })
 }
 
+/// CSS-Klassen der Registerkarte als Merker: Reiter mit „x“ bzw. ziehbar.
+const TABS_CLOSABLE: &str = "ruf-tabs-closable";
+const TABS_DETACHABLE: &str = "ruf-tabs-detachable";
+
+fn set_class(widget: &gtk::Widget, class: &str, on: bool) {
+    if on {
+        widget.add_css_class(class);
+    } else {
+        widget.remove_css_class(class);
+    }
+}
+
+/// Reiter einer Seite: Titel und (je nach Registerkarte sichtbar) ein „x“.
+/// Mittelklick schließt wie das „x“; ins Leere gezogen meldet `TabDetach`.
+/// Der Index wird erst beim Ereignis bestimmt (Seiten können wandern).
+fn tab_label(notebook: &gtk::Notebook, id: Id, page: &gtk::Widget, title: &str) -> gtk::Box {
+    let tab = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    tab.append(&gtk::Label::new(Some(title)));
+    let close = gtk::Button::from_icon_name("window-close-symbolic");
+    close.add_css_class("flat");
+    close.add_css_class("circular");
+    close.set_focus_on_click(false);
+    close.set_tooltip_text(Some(if crate::dialog::german() {
+        "Schließen"
+    } else {
+        "Close"
+    }));
+    close.set_visible(notebook.has_css_class(TABS_CLOSABLE));
+    tab.append(&close);
+    let index_of = {
+        let notebook = notebook.downgrade();
+        let page = page.downgrade();
+        move || -> Option<i32> {
+            let (n, p) = (notebook.upgrade()?, page.upgrade()?);
+            n.page_num(&p).map(|i| i as i32)
+        }
+    };
+    let i = index_of.clone();
+    close.connect_clicked(move |_| {
+        if let Some(index) = i() {
+            notify(id, Notify::TabClose(index));
+        }
+    });
+    let middle = gtk::GestureClick::new();
+    middle.set_button(2);
+    let i = index_of.clone();
+    let n = notebook.downgrade();
+    middle.connect_released(move |_, _, _, _| {
+        let closable = n.upgrade().is_some_and(|n| n.has_css_class(TABS_CLOSABLE));
+        if closable && let Some(index) = i() {
+            notify(id, Notify::TabClose(index));
+        }
+    });
+    tab.add_controller(middle);
+    // Herausziehen: nur, wenn die Registerkarte es erlaubt.
+    let source = gtk::DragSource::new();
+    source.set_actions(gdk::DragAction::COPY);
+    let n = notebook.downgrade();
+    source.connect_prepare(move |_, _, _| {
+        n.upgrade()
+            .filter(|n| n.has_css_class(TABS_DETACHABLE))
+            .map(|_| gdk::ContentProvider::for_value(&DragText("ruf-tab".into()).to_value()))
+    });
+    source.connect_drag_begin(|source, _| {
+        if let Some(w) = source.widget() {
+            let image = gtk::WidgetPaintable::new(Some(&w)).current_image();
+            source.set_icon(Some(&image), w.width() / 2, w.height() / 2);
+        }
+    });
+    let i = index_of;
+    source.connect_drag_cancel(move |_, _, reason| {
+        if reason == gdk::DragCancelReason::NoTarget
+            && let Some(index) = i()
+        {
+            notify(id, Notify::TabDetach(index));
+        }
+        false
+    });
+    tab.add_controller(source);
+    tab
+}
+
 /// Inhalt eines Ziehens aus einem Widget mit `set_drag_text` (nur innerhalb
 /// des Programms bekannt, siehe dort).
 #[derive(Clone, Debug, glib::Boxed)]
@@ -2974,12 +3086,7 @@ fn drop_target(id: Id) -> gtk::DropTarget {
     });
     target.connect_leave(move |_| dropped(crate::canvas::DropAction::Leave, 0.0, 0.0, None));
     target.connect_drop(move |_, value, x, y| {
-        dropped(
-            crate::canvas::DropAction::Drop,
-            x,
-            y,
-            drop_text(value),
-        );
+        dropped(crate::canvas::DropAction::Drop, x, y, drop_text(value));
         true
     });
     target
