@@ -1,63 +1,63 @@
 ---
 name: ruf-backend
-description: Die System-Ebene von RUF erweitern – neue Steuerelemente (WidgetKind), neue Widget-Fähigkeiten oder Toolkit-Funktionen im GTK-4-Backend (läuft auf Linux, Windows und macOS). Verwenden bei Änderungen an crates/ruf/src/backend/*, crates/ruf/src/core.rs oder bei Build-/Laufzeitfehlern, die nur ein Betriebssystem betreffen (z. B. fehlende GTK-DLLs unter Windows).
+description: Extend the system layer of RUF – new controls (WidgetKind), new widget capabilities or toolkit functions in the GTK 4 backend (runs on Linux, Windows and macOS). Use for changes to crates/ruf/src/backend/*, crates/ruf/src/core.rs or for build/run-time errors that affect only one operating system (e.g. missing GTK DLLs on Windows).
 ---
 
-# RUF-Backend erweitern
+# Extending the RUF backend
 
-RUF hat ein Backend: GTK 4 (`gtk4-rs`) auf allen Systemen. Win32 und Cocoa wurden am
-23.10.2026 entfernt (Git-Historie). Der Trait `Backend` bleibt als Schicht bestehen.
+RUF has one backend: GTK 4 (`gtk4-rs`) on all systems. Win32 and Cocoa were removed on
+23.10.2026 (Git history). The trait `Backend` stays as a layer.
 
-| Datei | Inhalt |
+| File | Content |
 |---|---|
-| `crates/ruf/src/backend/mod.rs` | Trait `Backend` – der Vertrag des Backends |
-| `crates/ruf/src/backend/gtk.rs` | GTK 4, Container `RufFixed` |
-| `crates/ruf/src/core.rs` | plattformunabhängige Logik: Registry, `sync`, Semantik |
-| `crates/ruf/src/widget.rs` | öffentliche API, ruft Kern bzw. `Platform::…` |
+| `crates/ruf/src/backend/mod.rs` | trait `Backend` – the backend's contract |
+| `crates/ruf/src/backend/gtk.rs` | GTK 4, container `RufFixed` |
+| `crates/ruf/src/core.rs` | platform-independent logic: registry, `sync`, semantics |
+| `crates/ruf/src/widget.rs` | public API, calls the core or `Platform::…` |
 
-## Grundregel: Was gehört wohin?
+## Basic rule: what goes where?
 
-- **Backend:** erzeugen, setzen, lesen, Benutzeraktionen melden
+- **Backend:** create, set, read, report user actions
   (`core::notify(id, Notify::Clicked | Changed | Activated | Resized(size))`,
   `core::close_requested`, `core::timer_fired`, `core::shortcut_fired`).
-- **Kern:** Semantik – wann Signale feuern, Exklusivität, Begrenzungen,
-  Auswahl-Semantik. Nicht ins Backend verlagern.
-- Während `core::setter(|| Platform::…)` ignoriert der Kern Meldungen; danach ruft er
-  `sync(id)` und feuert genau die geänderten Signale.
+- **Core:** semantics – when signals fire, exclusivity, limits, selection semantics.
+  Do not move this into the backend.
+- During `core::setter(|| Platform::…)` the core ignores reports; afterwards it calls
+  `sync(id)` and fires exactly the changed signals.
 
-## Rezept: neue Widget-Fähigkeit
+## Recipe: new widget capability
 
-1. Methode im Trait `Backend` ergänzen (deutscher Doc-Kommentar).
-2. Im GTK-Backend umsetzen.
-3. Öffentliche Methode in `widget.rs`: Zustand ggf. im Kern-Knoten (`core::update`)
-   ablegen, dann `core::setter(|| Platform::…)`; bei Zustandsänderungen `core::sync`.
-4. Test in `crates/rncl/tests/components.rs` (Funktion + Eintrag in der `tests`-Liste).
+1. Add the method to the trait `Backend` (doc comment in German, like the rest of the file).
+2. Implement it in the GTK backend.
+3. Public method in `widget.rs`: store state in the core node if needed (`core::update`),
+   then `core::setter(|| Platform::…)`; on state changes `core::sync`.
+4. Test in `crates/rncl/tests/components.rs` (function + entry in the `tests` list).
 
-## Rezept: neues Steuerelement
+## Recipe: new control
 
-1. `WidgetKind` in `core.rs` um die **nächste freie Zahl** ergänzen.
-2. `Signal::supported_by`, ggf. `is_container`/`has_range` anpassen.
-3. Im Backend: Fall in `create` (Signal-Verbindungen → `core::notify`) und in den
-   betroffenen Gettern/Settern.
-4. RNCL-Komponente → Skill `rncl-component`.
+1. Add the **next free number** to `WidgetKind` in `core.rs`.
+2. Adjust `Signal::supported_by`, and `is_container`/`has_range` if needed.
+3. In the backend: a case in `create` (signal connections → `core::notify`) and in the
+   affected getters/setters.
+4. RNCL component → skill `rncl-component`.
 
-## GTK-Hinweise
+## GTK notes
 
-- Steuerelemente nie kleiner als ihre natürliche Größe. Layout ist asynchron
-  (Frame-Clock); `RufFixed::size_allocate` meldet Größen per Idle.
-- `glib::MainContext::invoke` **nicht** für `post` benutzen (läuft u. U. im fremden
-  Thread) – `glib::idle_add_once`.
-- Tastenkürzel: `<Primary>` statt `<Control>` – unter macOS ist das die Befehlstaste.
-- Keine Linux-only-APIs (X11/Wayland-spezifisch); der Code läuft auch unter Windows
-  und macOS. Plattformunterschiede höchstens per `cfg!(target_os = …)`.
+- Controls are never smaller than their natural size. Layout is asynchronous
+  (frame clock); `RufFixed::size_allocate` reports sizes via idle.
+- Do **not** use `glib::MainContext::invoke` for `post` (may run in a foreign thread) –
+  use `glib::idle_add_once`.
+- Shortcuts: `<Primary>` instead of `<Control>` – on macOS that is the Command key.
+- No Linux-only APIs (X11/Wayland specific) without a guard; the code also runs on Windows
+  and macOS. Platform differences at most via `cfg!(target_os = …)`.
 
-## Prüfen
+## Checking
 
 ```bash
 cargo clippy --workspace --all-targets
 env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -a cargo test --workspace
 ```
 
-In einer Sandbox, die `/tmp/.X11-unix` abschottet, startet Xvfb nicht – Tests dann
-außerhalb der Sandbox. Windows/macOS: nativ bauen (MSYS2 UCRT64 bzw. Homebrew) und
-`cargo test --workspace`; Ausliefern mit `tools/bundle-*.sh` (`docs/de/release.md`).
+In a sandbox that shields `/tmp/.X11-unix`, Xvfb does not start – run the tests outside
+the sandbox. Windows/macOS: build natively (MSYS2 UCRT64 or Homebrew) and run
+`cargo test --workspace`; ship with `tools/bundle-*.sh` (`docs/en/release.md`).

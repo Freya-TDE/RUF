@@ -1,50 +1,50 @@
 ---
 name: rncl-component
-description: Neue RNCL-Komponente (UI-Element wie Button, Slider, Liste) für das RUF-Framework erstellen oder eine bestehende um Eigenschaften/Signale erweitern. Verwenden, wenn ein neues Widget, eine zusammengesetzte Komponente oder eine Drittanbieter-Komponente für RUF/RNCL/Freya TDE gebaut werden soll.
+description: Create a new RNCL component (UI element such as a button, slider or list) for the RUF framework, or extend an existing one with properties/signals. Use when a new widget, a composite component or a third-party component for RUF/RNCL/Freya TDE is to be built.
 ---
 
-# RNCL-Komponente erstellen
+# Creating an RNCL component
 
-Eine RNCL-Komponente ist eine pure Rust-Struktur, die ein natives `ruf::Widget`
-besitzt und `ruf::Component` implementiert. Referenzimplementierung:
-`crates/rncl/src/button.rs` – vor dem Schreiben lesen und das Muster kopieren.
+An RNCL component is a pure Rust struct that owns a native `ruf::Widget` and implements
+`ruf::Component`. Reference implementation: `crates/rncl/src/button.rs` – read it before
+writing and copy the pattern.
 
-## Entscheidung: Welche Art Komponente?
+## Decision: which kind of component?
 
-1. **Zusammengesetzt** (aus vorhandenen Komponenten, z. B. Label + Textfeld):
-   kein C++ nötig. Vorlage: `crates/rncl/examples/custom_component.rs` (`LabeledField`).
-   Das äußere `RnclPanel` ist das `widget()` der Komponente.
-2. **Steuerelement, das RUF schon erzeugen kann** (`WidgetKind`): nur Rust.
-3. **Neues natives Steuerelement** (z. B. Datumswähler): zuerst alle drei Backends erweitern
-   → Skill `ruf-backend`, danach hier weiter.
+1. **Composite** (from existing components, e.g. label + text field): no native code
+   needed. Template: `crates/rncl/examples/custom_component.rs` (`LabeledField`).
+   The outer `RnclPanel` is the component's `widget()`.
+2. **A control RUF can already create** (`WidgetKind`): Rust only.
+3. **A new native control** (e.g. a date picker): extend the backend first
+   → skill `ruf-backend`, then continue here.
 
-## Pflichtbestandteile (Checkliste)
+## Required parts (checklist)
 
 - [ ] `#[derive(Debug, Clone)] pub struct RnclXxx { widget: Widget }`
-      (`Clone` = nicht besitzender Verweis, für Closures).
-- [ ] `pub const TYPE_NAME: &'static str = "RnclXxx";` – eindeutig in der Registry.
-- [ ] Konstante je eigener Eigenschaft: `pub const VALUE: &'static str = "value";` (snake_case).
-- [ ] `pub fn new<P: AsWidget + ?Sized>(parent: &P, …) -> Self` → ruft `with_parent`.
+      (`Clone` = non-owning reference, for closures).
+- [ ] `pub const TYPE_NAME: &'static str = "RnclXxx";` – unique in the registry.
+- [ ] One constant per own property: `pub const VALUE: &'static str = "value";` (snake_case).
+- [ ] `pub fn new<P: AsWidget + ?Sized>(parent: &P, …) -> Self` → calls `with_parent`.
 - [ ] `pub fn with_parent(parent: Option<&Widget>, …) -> Self` → `Widget::create(kind, parent)`;
-      bei Text-Widgets danach `widget.adjust_size()`.
-- [ ] Typisierte Methoden (`set_value`/`value`, `on_value_changed(impl FnMut(..) + 'static)`).
-      Setter nehmen `&self` (Kern und System halten den Zustand).
-- [ ] `pub fn info() -> ComponentInfo` mit `.category(..)`, `.description(..)`, ggf. `.container(true)`.
-- [ ] `impl Component`: `widget`, `type_name`, und bei eigenen Eigenschaften
-      `properties` (`base::descriptors()` + eigene), `property`, `set_property`
-      – unbekannte Namen immer an `base::get` / `base::set` delegieren,
-      Werte mit `base::expect_text/int/bool/text_list(name, &value)?` prüfen.
-      Gleichartige Eigenschaften nicht neu schreiben, sondern die Helfer aus
-      `crates/rncl/src/props.rs` nutzen (`text`, `items`, `range`, `orientation`);
-      deren `set` liefert `None`, wenn der Name nicht passt → Kette mit
-      `.or_else(..).unwrap_or_else(|| base::set(..))`, Vorbild `slider.rs`.
+      for text widgets `widget.adjust_size()` afterwards.
+- [ ] Typed methods (`set_value`/`value`, `on_value_changed(impl FnMut(..) + 'static)`).
+      Setters take `&self` (core and system hold the state).
+- [ ] `pub fn info() -> ComponentInfo` with `.category(..)`, `.description(..)`, and
+      `.container(true)` if needed.
+- [ ] `impl Component`: `widget`, `type_name`, and for own properties
+      `properties` (`base::descriptors()` + own), `property`, `set_property`
+      – always delegate unknown names to `base::get` / `base::set`,
+      check values with `base::expect_text/int/bool/text_list(name, &value)?`.
+      Do not rewrite similar properties; use the helpers from `crates/rncl/src/props.rs`
+      (`text`, `items`, `range`, `orientation`); their `set` returns `None` if the name does
+      not match → chain with `.or_else(..).unwrap_or_else(|| base::set(..))`, model `slider.rs`.
 - [ ] In `crates/rncl/src/lib.rs`: `mod`, `pub use`, `register_all`, `prelude`,
-      Tabelle im Crate-Doc.
-- [ ] Test in `crates/rncl/tests/components.rs` ergänzen (Funktion schreiben **und**
-      in die `tests`-Liste in `main` eintragen; `registry_create` prüft die Anzahl).
-- [ ] Doku: `docs/de/komponenten.md` und `docs/en/components.md`.
+      table in the crate doc.
+- [ ] Add a test to `crates/rncl/tests/components.rs` (write the function **and** add it to
+      the `tests` list in `main`; `registry_create` checks the count).
+- [ ] Docs: `docs/de/komponenten.md` and `docs/en/components.md`.
 
-## Gerüst
+## Skeleton
 
 ```rust
 use ruf::{AsWidget, Component, ComponentInfo, PropertyDescriptor, PropertyError,
@@ -98,21 +98,21 @@ impl Component for RnclXxx {
 }
 ```
 
-## Regeln
+## Rules
 
-- Kein `unsafe` in Komponenten; FFI gehört ausschließlich in `crates/ruf`.
-- Keine Threads: Widgets sind `!Send`; alles läuft im GUI-Thread.
-- Eigenschaftsnamen sind öffentliche API für den Designer – nicht umbenennen.
-- Beschreibungstexte kurz und deutsch (sie erscheinen im Designer).
+- No `unsafe` in components; FFI belongs exclusively in `crates/ruf`.
+- No threads: widgets are `!Send`; everything runs in the GUI thread.
+- Property names are public API for the designer – do not rename them.
+- Description texts short and, like the existing ones, in German (they appear in the designer).
 
-## Prüfen
+## Checking
 
 ```bash
 cargo clippy --workspace --all-targets
 cargo test --workspace
-# Sichtprüfung ohne Bildschirm (Bild danach ansehen):
+# Visual check without a screen (look at the image afterwards):
 xvfb-run -a cargo run -p rncl --example designer -- --screenshot /tmp/form.png
 ```
 
-Für eine Sichtprüfung der neuen Komponente: sie in einem Beispiel anlegen,
-`window.show(); Application::process_events(); window.widget().save_screenshot(pfad)`.
+For a visual check of the new component: create it in an example, then
+`window.show(); Application::process_events(); window.widget().save_screenshot(path)`.

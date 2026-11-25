@@ -1,109 +1,111 @@
 ---
 name: ruf-app
-description: Eine Desktop-Anwendung oder ein Formular mit RUF und RNCL-Komponenten bauen (Fenster, Buttons, Eingabefelder, Ereignisse), inkl. Sichtprüfung per Offscreen-Screenshot. Verwenden, wenn mit ruf/rncl eine Oberfläche erstellt, ein Beispiel geschrieben oder ein Fehler in einer RUF-App gesucht wird.
+description: Build a desktop application or a form with RUF and RNCL components (windows, buttons, input fields, events), including a visual check via offscreen screenshot. Use when creating a user interface with ruf/rncl, writing an example or looking for a bug in a RUF app.
 ---
 
-# Anwendung mit RUF/RNCL bauen
+# Building an application with RUF/RNCL
 
-## Abhängigkeiten
+## Dependencies
 
 ```toml
 [dependencies]
-ruf  = { version = "0.2" }
-rncl = { version = "0.2" }
+ruf  = { version = "0.4" }
+rncl = { version = "0.4" }
 ```
 
-RUF nutzt GTK 4 auf Linux, Windows und macOS (braucht `gtk4`-Entwicklungsdateien;
-Windows: MSYS2 UCRT64, macOS: Homebrew). Kein C++, kein Qt, keine Features.
-Ausliefern samt GTK-Laufzeit: `tools/bundle-*.sh`, siehe `docs/de/release.md`.
+RUF uses GTK 4 on Linux, Windows and macOS (needs the `gtk4` development files;
+Windows: MSYS2 UCRT64, macOS: Homebrew). No C++, no Qt, no features.
+Shipping with the GTK runtime: `tools/bundle-*.sh`, see `docs/en/release.md`.
 
-## Grundmuster
+## Basic pattern
 
 ```rust
 use rncl::prelude::*;
 
 fn main() {
-    let app = Application::new();                // 1. immer zuerst
-    let window = RnclWindow::new("Titel");       // 2. Fenster
+    let app = Application::new();                // 1. always first
+    let window = RnclWindow::new("Title");       // 2. window
     window.set_size(400, 300);
 
-    let label = RnclLabel::new(&window, "…");    // 3. Kinder: Position relativ zum Elternteil
+    let label = RnclLabel::new(&window, "…");    // 3. children: position relative to the parent
     label.set_geometry(20, 20, 360, 24);
 
     let button = RnclButton::new(&window, "OK");
     button.set_position(20, 60);
-    let l = label.clone();                       // 4. Klon für die Closure
-    button.on_clicked(move || l.set_text("Geklickt"));
+    let l = label.clone();                       // 4. clone for the closure
+    button.on_clicked(move || l.set_text("Clicked"));
 
-    window.show();                               // 5. anzeigen
-    std::process::exit(app.exec());              // 6. Event-Loop
+    window.show();                               // 5. show
+    std::process::exit(app.exec());              // 6. event loop
 }
 ```
 
-## Komponenten (Stand 0.1 – vollständige Referenz: `docs/de/komponenten.md`)
+## Components (full reference: `docs/en/components.md`)
 
-| Typ | Konstruktor | Wichtigste API |
+| Type | Constructor | Main API |
 |---|---|---|
 | `RnclWindow` | `new(title)` | `set_title`, `close`, `on_resized`, `on_close_requested`, `add_shortcut` |
-| `RnclPanel` | `new(&parent)` | Container, Positionen relativ |
-| `RnclGroupBox` | `new(&parent, title)` | Container mit Rahmen; Titel belegt oben ~20 px |
+| `RnclPanel` | `new(&parent)` | container, positions relative |
+| `RnclGroupBox` | `new(&parent, title)` | container with frame; the title takes ~20 px at the top |
 | `RnclTabView` | `new(&parent)` | `add_tab(title) -> RnclPanel`, `remove_tab`, `set_current_index`, `on_current_index_changed` |
 | `RnclButton` | `new(&parent, text)` | `set_text`, `on_clicked`, `click` |
-| `RnclLabel` | `new(&parent, text)` | `set_text` (einfaches HTML erlaubt), `set_word_wrap` |
+| `RnclLabel` | `new(&parent, text)` | `set_text` (simple HTML allowed), `set_word_wrap` |
 | `RnclTextField` | `new(&parent)` | `set_text`, `set_placeholder`, `set_password_mode`, `set_read_only`, `on_text_changed`, `on_return_pressed` |
-| `RnclTextArea` | `new(&parent)` | `set_text`, `append_line`, `set_read_only`, `on_text_changed`; Code-Editor: `set_monospace`, `add_highlight_rule`, `set_marked_line`, `goto_line` |
+| `RnclTextArea` | `new(&parent)` | `set_text`, `append_line`, `set_read_only`, `on_text_changed`; code editor: `set_monospace`, `add_highlight_rule`, `set_marked_line`, `goto_line` |
 | `RnclCheckBox` | `new(&parent, text)` | `set_checked`, `is_checked`, `on_toggled`, `click` |
-| `RnclRadioButton` | `new(&parent, text)` | wie CheckBox; exklusiv je Elternteil → Gruppen per `RnclGroupBox` |
+| `RnclRadioButton` | `new(&parent, text)` | like CheckBox; exclusive per parent → groups via `RnclGroupBox` |
 | `RnclComboBox` | `new(&parent)` | `set_items`, `current_index`, `current_text`, `set_editable`, `on_current_index_changed`, `on_text_changed` |
 | `RnclListBox` | `new(&parent)` | `set_items`, `add_item`, `current_index`, `current_text() -> Option`, `on_current_index_changed` |
-| `RnclSpinBox` | `new(&parent)` | `set_range`, `set_value`, `on_value_changed` (Standard 0…99) |
-| `RnclSlider` | `new(&parent)` | `set_range`, `set_value`, `set_vertical`, `on_value_changed` (Standard 0…99) |
-| `RnclProgressBar` | `new(&parent)` | `set_value`, `set_range`, `set_busy` (Standard 0…100) |
-| `RnclScrollView` | `new(&parent)` | Kinder in `content()`, `set_content_size(0, höhe)` |
-| `RnclImageBox` | `new(&parent)` | `set_file(path) -> io::Result`, `set_image`, `set_fit(ImageFit)`, `set_gamma`, `set_opacity`, `on_clicked` (Standard 96×96) |
-| `RnclImageScrollBox` | `new(&parent)` | `set_files(&[..]) -> Vec<nicht lesbar>`, `set_images`, `set_layout(GalleryLayout)`, `set_thumb_size`, `set_spacing`, `current_index`, `current_file`, `on_current_index_changed` |
+| `RnclSpinBox` | `new(&parent)` | `set_range`, `set_value`, `on_value_changed` (default 0…99) |
+| `RnclSlider` | `new(&parent)` | `set_range`, `set_value`, `set_vertical`, `on_value_changed` (default 0…99) |
+| `RnclProgressBar` | `new(&parent)` | `set_value`, `set_range`, `set_busy` (default 0…100) |
+| `RnclScrollView` | `new(&parent)` | children in `content()`, `set_content_size(0, height)` |
+| `RnclImageBox` | `new(&parent)` | `set_file(path) -> io::Result`, `set_image`, `set_fit(ImageFit)`, `set_gamma`, `set_opacity`, `on_clicked` (default 96×96) |
+| `RnclImageScrollBox` | `new(&parent)` | `set_files(&[..]) -> Vec<unreadable>`, `set_images`, `set_layout(GalleryLayout)`, `set_thumb_size`, `set_spacing`, `current_index`, `current_file`, `on_current_index_changed` |
 
-Alle (Trait `Component`, kommt mit der prelude): `set_position`, `set_size`,
+All of them (trait `Component`, comes with the prelude): `set_position`, `set_size`,
 `set_geometry`, `show`, `hide`, `set_enabled`, `set_tool_tip`, `set_style_sheet`,
 `set_name`, `property`/`set_property`.
 
-## Dynamische Oberflächen und Hintergrundarbeit
+## Dynamic user interfaces and background work
 
-- **Layout bei Größenänderung:** RUF positioniert absolut. `window.on_resized(|w, h| …)`
-  bzw. `panel.widget().on_resized(…)` (z. B. für Tab-Seiten) aufrufen und dort
-  `set_geometry` der Kinder setzen.
-- **Zur Laufzeit erzeugte Kinder** sind sofort sichtbar; entfernen mit
-  `komponente.widget().delete_later()`.
-- **Entprellen:** `ruf::Timer` (single shot) bei jeder Eingabe neu `start(ms)`.
-- **Netzwerk/Dateien/Prozesse:** im `std::thread` ausführen, Ergebnis per
-  `ruf::GuiSender::new(move |v: T| …)` zurück – der Handler läuft im GUI-Thread.
-  Veraltete Antworten mit einem Generationszähler verwerfen.
-- **Rückfragen:** `ruf::dialog::{information, warning, error, confirm, input, password}` (modal –
-  nicht in Tests), Schließen abfangen mit `window.on_close_requested(|| bool)`.
-- **Signale beim Befüllen:** Setter lösen Signale aus. Beim programmatischen
-  Befüllen ein `Cell<bool>`-Flag setzen und in den Handlern prüfen.
+- **Layout on resize:** RUF positions absolutely. Call `window.on_resized(|w, h| …)`
+  or `panel.widget().on_resized(…)` (e.g. for tab pages) and set the children's
+  `set_geometry` there.
+- **Children created at run time** are visible at once; remove them with
+  `component.widget().delete_later()`.
+- **Debouncing:** `ruf::Timer` (single shot), `start(ms)` again on every input.
+- **Network/files/processes:** run in a `std::thread`, send the result back with
+  `ruf::GuiSender::new(move |v: T| …)` – the handler runs in the GUI thread.
+  Discard outdated answers with a generation counter.
+- **Questions:** `ruf::dialog::{information, warning, error, confirm, input, password}` (modal –
+  not in tests); intercept closing with `window.on_close_requested(|| bool)`.
+- **Signals while filling:** setters fire signals. When filling programmatically, set a
+  `Cell<bool>` flag and check it in the handlers.
+- **Texts in several languages:** `ruf::i18n` (TOML per language, `ruf::tr!`), see
+  `docs/en/components.md`.
 
-Größeres Praxisbeispiel: `../CT-Editor` (Suche mit Hintergrund-Threads, dynamische
-Checkbox-Listen, Code-Editor, Tabs mit eigener Layout-Funktion).
+Larger practical example: `../CT-Editor` (search with background threads, dynamic
+checkbox lists, code editor, tabs with their own layout function).
 
-## Regeln, die Fehler vermeiden
+## Rules that avoid bugs
 
-- `Application` vor jeder Komponente erzeugen, sonst Panik mit klarer Meldung.
-- Nur **eine** `Application` pro Prozess; alles im Hauptthread.
-- Das besitzende `RnclWindow` am Leben halten (Variable in `main`). Wird es
-  gedroppt, verschwindet das Fenster samt Kindern. Kinder-Variablen dürfen
-  gedroppt werden – die Widgets bleiben (das Elternteil besitzt sie).
-- Closures brauchen `'static`: Komponenten per `.clone()` einfangen, eigenen
-  Zustand per `Rc<Cell<_>>`/`Rc<RefCell<_>>` teilen.
-- Signale feuern auch bei programmatischen Änderungen (`set_text`, `set_checked`).
-- **Plattformunterschiede:** GTK macht Steuerelemente nie kleiner als ihre natürliche
-  Größe (für Knöpfe/Labels `adjust_size()` nutzen); GTK-Layout ist asynchron
-  (`process_events()` wartet darauf); `set_style_sheet` kennt nur `color`,
-  `background`, `font-weight`; Highlight-Muster ohne Lookarounds (Gruppe 1 färbt).
-- `Application::quit()`, `Application::set_color_scheme(..)` sind assoziierte Funktionen
-  und daher aus jeder Closure aufrufbar.
+- Create the `Application` before any component, otherwise it panics with a clear message.
+- Only **one** `Application` per process; everything on the main thread.
+- Keep the owning `RnclWindow` alive (a variable in `main`). If it is dropped, the window
+  disappears with its children. Child variables may be dropped – the widgets stay (the
+  parent owns them).
+- Closures need `'static`: capture components with `.clone()`, share own state with
+  `Rc<Cell<_>>`/`Rc<RefCell<_>>`.
+- Signals also fire on programmatic changes (`set_text`, `set_checked`).
+- **Platform differences:** GTK never makes controls smaller than their natural size (use
+  `adjust_size()` for buttons/labels); GTK layout is asynchronous (`process_events()` waits
+  for it); `set_style_sheet` only knows `color`, `background`, `font-weight`; highlight
+  patterns without lookarounds (group 1 is colored).
+- `Application::quit()` and `Application::set_color_scheme(..)` are associated functions and
+  can therefore be called from any closure.
 
-## Sichtprüfung ohne Bildschirm (für KI-Agenten)
+## Visual check without a screen (for AI agents)
 
 ```rust
 window.show();
@@ -112,15 +114,15 @@ window.widget().save_screenshot("/tmp/ui.png");
 ```
 
 ```bash
-xvfb-run -a cargo run --example mein_beispiel   # Linux ohne Bildschirm
+xvfb-run -a cargo run --example my_example   # Linux without a screen
 ```
 
-Danach das PNG ansehen und Layout (Überlappungen, abgeschnittene Texte) prüfen.
-Fertige Beispiele: `cargo run -p rncl --example designer -- --screenshot /tmp/form.png`
-und `cargo run -p rncl --example gallery -- --screenshot /tmp/gallery.png` (alle Komponenten).
+Then look at the PNG and check the layout (overlaps, cut-off texts).
+Ready-made examples: `cargo run -p rncl --example designer -- --screenshot /tmp/form.png`
+and `cargo run -p rncl --example gallery -- --screenshot /tmp/gallery.png` (all components).
 
 ## Tests
 
-Tests mit Oberfläche brauchen den Hauptthread: Testdatei mit `harness = false` und eigenem
-`main()`, `Application::new()`; Linux ohne Bildschirm: `xvfb-run -a cargo test`.
-Vorlage: `crates/rncl/tests/components.rs`.
+Tests with a user interface need the main thread: a test file with `harness = false` and its
+own `main()`, `Application::new()`; Linux without a screen: `xvfb-run -a cargo test`.
+Template: `crates/rncl/tests/components.rs`.
