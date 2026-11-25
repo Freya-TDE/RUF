@@ -271,6 +271,8 @@ thread_local! {
     static FOLLOW_SYSTEM: Cell<bool> = const { Cell::new(true) };
     /// Vorgemerkte Fensterpositionen (angewendet, sobald das Fenster erscheint).
     static PENDING_POSITIONS: RefCell<HashMap<Id, (i32, i32)>> = RefCell::new(HashMap::new());
+    /// Lage sichtbarer Fenster vor einer Größenänderung, bis sie geprüft ist.
+    static KEEP_POSITIONS: RefCell<HashMap<Id, Point>> = RefCell::new(HashMap::new());
     static RADIO_GROUPS: RefCell<Vec<(glib::WeakRef<gtk::Widget>, glib::WeakRef<gtk::CheckButton>)>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -1218,7 +1220,32 @@ impl Backend for Gtk {
     fn set_geometry(native: &GtkNative, kind: WidgetKind, rect: Rect) {
         let (w, h) = (rect.width.max(0), rect.height.max(0));
         match &native.inner {
-            Inner::Window(window) => window.set_default_size(w.max(1), h.max(1)),
+            Inner::Window(window) => {
+                // X11: GTK schickt beim Vergrößern eines sichtbaren Fensters die
+                // Lage des Inhalts mit, der Fenstermanager legt dort den Rahmen
+                // hin – jedes Mal rutschte das Fenster um Titelleiste und Rand.
+                // Die Lage vorher merken und, falls verrutscht, wieder setzen.
+                // Folgen mehrere Größenänderungen dicht aufeinander, gilt die
+                // Lage vor der ersten (die spätere wäre schon verrutscht).
+                let id = native.id;
+                let pending = KEEP_POSITIONS.with(|k| k.borrow().get(&id).copied());
+                let keep = (cfg!(all(unix, not(target_os = "macos"))) && window.is_mapped())
+                    .then(|| pending.or_else(|| position::get(window)))
+                    .flatten();
+                window.set_default_size(w.max(1), h.max(1));
+                if let Some(p) = keep
+                    && pending.is_none()
+                {
+                    KEEP_POSITIONS.with(|k| k.borrow_mut().insert(id, p));
+                    let window = window.clone();
+                    glib::timeout_add_local_once(Duration::from_millis(150), move || {
+                        KEEP_POSITIONS.with(|k| k.borrow_mut().remove(&id));
+                        if window.is_mapped() && position::get(&window) != Some(p) {
+                            position::set(&window, p.x, p.y);
+                        }
+                    });
+                }
+            }
             _ => {
                 native.outer.set_size_request(w, h);
                 if let Some(fixed) = parent_fixed(&native.outer) {
