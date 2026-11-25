@@ -682,14 +682,14 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rncl"
-version = "0.3.5"
+version = "0.4.0"
 dependencies = [
  "ruf",
 ]
 
 [[package]]
 name = "ruf"
-version = "0.3.5"
+version = "0.4.0"
 dependencies = [
  "gdk4-macos",
  "gdk4-win32",
@@ -700,6 +700,7 @@ dependencies = [
  "pangocairo",
  "regex",
  "sourceview5",
+ "toml_edit",
  "windows-sys",
 ]
 
@@ -870,6 +871,7 @@ dependencies = [
  "indexmap",
  "toml_datetime",
  "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 

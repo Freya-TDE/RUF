@@ -680,6 +680,30 @@ ruf::dialog::set_automatic(Some(true));
 The dialogs are modal and block until answered – do not call them in automated
 tests.
 
+
+### `ruf::i18n` – multiple languages
+
+Texts are TOML files per language (`locales/de.toml`, `locales/en.toml`); the program embeds
+and registers them. A missing text falls back to English, finally to the key itself.
+
+```rust
+use ruf::{i18n, tr};
+
+i18n::register(&[
+    ("de", include_str!("../locales/de.toml")), // [menu] save = "Speichern"
+    ("en", include_str!("../locales/en.toml")), // [menu] save = "Save"
+]);
+i18n::set_language(&i18n::system_language()); // e.g. en_US.UTF-8 → en
+let text = tr!("menu.save");
+let status = tr!("status.saved", path = "main.rs"); // "{path} saved"
+// More languages without recompiling: every *.toml of a folder.
+let _ = i18n::load_dir(std::path::Path::new("/path/to/languages"));
+```
+
+`i18n::system_language()` reads `LC_ALL`/`LC_MESSAGES`/`LANG` on Linux, the user's language
+on Windows and the system setting on macOS. `name_of("de")` gives a language's name in
+itself (key `language.name`), `available()` all registered languages.
+
 ---
 
 ## Notes

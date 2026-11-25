@@ -47,6 +47,7 @@ mod code;
 mod component;
 mod core;
 pub mod dialog;
+pub mod i18n;
 mod geometry;
 mod gui_sender;
 mod menu;

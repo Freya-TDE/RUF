@@ -684,6 +684,30 @@ ruf::dialog::set_automatic(Some(true));
 Die Dialoge sind modal und blockieren bis zur Antwort – in automatischen Tests
 nicht aufrufen.
 
+### `ruf::i18n` – Mehrsprachigkeit
+
+Texte liegen als TOML je Sprache vor (`locales/de.toml`, `locales/en.toml`), das Programm
+bettet sie ein und meldet sie an. Fehlt ein Text, gilt Englisch, zuletzt der Schlüssel selbst.
+
+```rust
+use ruf::{i18n, tr};
+
+i18n::register(&[
+    ("de", include_str!("../locales/de.toml")), // [menu] save = "Speichern"
+    ("en", include_str!("../locales/en.toml")), // [menu] save = "Save"
+]);
+i18n::set_language(&i18n::system_language()); // z. B. de_DE.UTF-8 → de
+let text = tr!("menu.save");
+let status = tr!("status.saved", path = "main.rs"); // "{path} gespeichert"
+// Weitere Sprachen ohne Neukompilieren: alle *.toml eines Ordners.
+let _ = i18n::load_dir(std::path::Path::new("/pfad/zu/sprachen"));
+```
+
+`i18n::system_language()` liest unter Linux `LC_ALL`/`LC_MESSAGES`/`LANG`, unter Windows
+die Sprache des Benutzers und unter macOS die Systemeinstellung. `name_of("de")` liefert
+den Namen einer Sprache in ihr selbst (Schlüssel `language.name`), `available()` alle
+angemeldeten Sprachen.
+
 ---
 
 ## Hinweise

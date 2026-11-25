@@ -23,7 +23,9 @@ RUF ist die Grundlage der Editor-Oberfläche des RAD-Tools
 - Nur GTK 4 auf allen Systemen (seit 23.10.2026): Win32 und Cocoa wurden entfernt,
   Qt wird seit 22.10.2026 nicht mehr verwendet. Das Backend bleibt hinter einem
   Rust-Trait, damit ein anderes Toolkit später möglich wäre.
-- Abhängigkeiten: `gtk4` (Backend), `regex` (Syntax-Hervorhebung im Code-Editor).
+- Abhängigkeiten: `gtk4` (Backend), `regex` (Syntax-Hervorhebung im Code-Editor),
+  `toml_edit` (Texte je Sprache für `ruf::i18n`, seit 0.4; das System stammt aus dem CT-Editor
+  und gilt für alle Programme auf RUF – Freya TDE, CT-Editor – mit `ruf::tr!`).
   Weitere Crates nur in aktuellen, stabilen Versionen und mit freier Lizenz.
 - Veröffentlicht auf crates.io (seit 16.11.2026): `ruf = "0.3"`, `rncl = "0.3"`, API-Doku
   auf docs.rs. Neue Version: Version im Workspace erhöhen, `cargo publish --workspace`,
