@@ -283,7 +283,10 @@ mod tests {
         assert_eq!(candidates("de-AT"), ["de-at", "de"]);
         register(&[
             ("de", "[t]\na = \"A-de\"\nb = \"{n} Dateien\""),
-            ("en", "[t]\na = \"A-en\"\nb = \"{n} files\"\nonly_en = \"x\""),
+            (
+                "en",
+                "[t]\na = \"A-en\"\nb = \"{n} files\"\nonly_en = \"x\"",
+            ),
         ]);
         assert_eq!(set_language("de_AT.UTF-8"), "de");
         assert_eq!(translate("t.a"), "A-de");
