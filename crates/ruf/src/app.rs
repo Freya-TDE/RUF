@@ -119,6 +119,14 @@ impl Application {
     pub fn set_color_scheme(scheme: ColorScheme) -> bool {
         Platform::set_color_scheme(scheme)
     }
+
+    /// Wird nach jedem Wechsel zwischen Hell und Dunkel aufgerufen (durch
+    /// [`Application::set_color_scheme`] oder im System), z. B. für selbst
+    /// gezeichnete Flächen, die ihre Farben aus [`Application::color_scheme`]
+    /// nehmen.
+    pub fn on_color_scheme_changed(f: impl Fn() + 'static) {
+        Platform::watch_color_scheme(Box::new(f));
+    }
 }
 
 impl Default for Application {

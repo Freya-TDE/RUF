@@ -705,17 +705,30 @@ impl Backend for Gtk {
             return false;
         };
         if scheme == ColorScheme::Unknown {
-            // Wieder dem System folgen.
+            // Wieder dem System folgen, auch mit dem Thema des Systems.
             FOLLOW_SYSTEM.set(true);
+            settings.reset_property("gtk-theme-name");
             match system_scheme::dark() {
                 Some(_) => apply_system_scheme(),
                 None => set_dark(&settings, None),
             }
         } else {
             FOLLOW_SYSTEM.set(false);
+            // Fest gewählt: das eingebaute Adwaita, das Hell und Dunkel
+            // umschaltet. Themen wie Breeze (KDE) nehmen ihre Farben fest aus
+            // den Systemfarben (`~/.config/gtk-4.0/colors.css`) und blieben so,
+            // wie das System gerade ist.
+            if settings.gtk_theme_name().as_deref() != Some("Adwaita") {
+                settings.set_gtk_theme_name(Some("Adwaita"));
+            }
             set_dark(&settings, Some(scheme == ColorScheme::Dark));
         }
+        notify_scheme_watchers();
         true
+    }
+
+    fn watch_color_scheme(f: Box<dyn Fn()>) {
+        SCHEME_WATCHERS.with(|w| w.borrow_mut().push(f));
     }
 
     fn message(parent: Option<&GtkNative>, kind: MessageKind, title: &str, text: &str) {
@@ -1337,12 +1350,7 @@ impl Backend for Gtk {
             ))
         });
         // Ins Leere abgelegt (neben jedes Fenster): melden.
-        source.connect_drag_cancel(move |_, _, reason| {
-            if reason == gdk::DragCancelReason::NoTarget {
-                notify(id, Notify::DragCancelled);
-            }
-            false
-        });
+        watch_drag_end(&source, move || notify(id, Notify::DragCancelled));
         // Ein Standbild des Widgets unter der Maus. Kein lebendes
         // `WidgetPaintable`: unter Windows 11 blieben dessen Bilder nach dem
         // Ziehen als Fenster stehen.
@@ -3035,13 +3043,10 @@ fn tab_label(notebook: &gtk::Notebook, id: Id, page: &gtk::Widget, title: &str) 
         }
     });
     let i = index_of;
-    source.connect_drag_cancel(move |_, _, reason| {
-        if reason == gdk::DragCancelReason::NoTarget
-            && let Some(index) = i()
-        {
+    watch_drag_end(&source, move || {
+        if let Some(index) = i() {
             notify(id, Notify::TabDetach(index));
         }
-        false
     });
     tab.add_controller(source);
     tab
@@ -3052,6 +3057,35 @@ fn tab_label(notebook: &gtk::Notebook, id: Id, page: &gtk::Widget, title: &str) 
 #[derive(Clone, Debug, glib::Boxed)]
 #[boxed_type(name = "RufDragText")]
 struct DragText(String);
+
+thread_local! {
+    /// Das laufende Ziehen wurde in einem Ablageziel dieses Programms abgelegt.
+    static DROPPED_HERE: Cell<bool> = const { Cell::new(false) };
+    /// Mit Esc abgebrochen (dann gilt es nicht als „ins Leere gezogen“).
+    static DRAG_ABORTED: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Ruft `outside`, wenn ein Ziehen aus `source` endet, ohne in einem eigenen
+/// Ablageziel zu landen, und nicht mit Esc abgebrochen wurde. Der Grund des
+/// Abbruchs allein taugt nicht: unter XWayland (KDE) meldet GTK das Ablegen
+/// auf dem Desktop, der unseren Typ ablehnt, nicht als „kein Ziel“.
+fn watch_drag_end(source: &gtk::DragSource, outside: impl Fn() + 'static) {
+    source.connect_drag_begin(|_, _| {
+        DROPPED_HERE.set(false);
+        DRAG_ABORTED.set(false);
+    });
+    source.connect_drag_cancel(|_, _, reason| {
+        if reason == gdk::DragCancelReason::UserCancelled {
+            DRAG_ABORTED.set(true);
+        }
+        false
+    });
+    source.connect_drag_end(move |_, _, _| {
+        if !DROPPED_HERE.get() && !DRAG_ABORTED.get() {
+            outside();
+        }
+    });
+}
 
 /// Text eines Ziehens: eigener Typ oder Text aus einem anderen Programm.
 fn drop_text(value: &glib::Value) -> Option<String> {
@@ -3086,6 +3120,7 @@ fn drop_target(id: Id) -> gtk::DropTarget {
     });
     target.connect_leave(move |_| dropped(crate::canvas::DropAction::Leave, 0.0, 0.0, None));
     target.connect_drop(move |_, value, x, y| {
+        DROPPED_HERE.set(true);
         dropped(crate::canvas::DropAction::Drop, x, y, drop_text(value));
         true
     });
@@ -3363,6 +3398,10 @@ mod position {
         true
     }
 
+    /// Lage des Fensters samt Rahmen des Fenstermanagers – dieselbe Bedeutung
+    /// wie bei [`set`]: dort legt `XMoveWindow` (Schwerkraft Nordwest) die
+    /// linke obere Ecke des Rahmens fest. Ohne Abzug des Rahmens wanderte ein
+    /// Fenster bei jedem Neustart um Titelleiste und Rand (KWin).
     pub fn get(window: &gtk::Window) -> Option<Point> {
         let x11 = xlib()?;
         let (display, xid) = handles(window)?;
@@ -3372,7 +3411,54 @@ mod position {
             let root = (x11.XDefaultRootWindow)(display);
             (x11.XTranslateCoordinates)(display, xid, root, 0, 0, &mut x, &mut y, &mut child)
         };
-        (ok != 0).then_some(Point::new(x, y))
+        if ok == 0 {
+            return None;
+        }
+        let (left, top) = frame_extents(x11, display, xid).unwrap_or((0, 0));
+        Some(Point::new(x - left, y - top))
+    }
+
+    /// `_NET_FRAME_EXTENTS` (links, rechts, oben, unten), vom Fenstermanager
+    /// gesetzt; liefert links und oben.
+    fn frame_extents(
+        x11: &xlib::Xlib,
+        display: *mut xlib::Display,
+        xid: xlib::Window,
+    ) -> Option<(i32, i32)> {
+        // SAFETY: gültige Verbindung und Fensterkennung; die gelieferten Daten
+        // gehören Xlib und werden mit XFree freigegeben.
+        unsafe {
+            let atom = (x11.XInternAtom)(display, c"_NET_FRAME_EXTENTS".as_ptr(), xlib::True);
+            if atom == 0 {
+                return None;
+            }
+            let (mut actual, mut format, mut items, mut rest) = (0, 0, 0, 0);
+            let mut data: *mut u8 = std::ptr::null_mut();
+            let status = (x11.XGetWindowProperty)(
+                display,
+                xid,
+                atom,
+                0,
+                4,
+                xlib::False,
+                xlib::XA_CARDINAL,
+                &mut actual,
+                &mut format,
+                &mut items,
+                &mut rest,
+                &mut data,
+            );
+            if data.is_null() {
+                return None;
+            }
+            // Format 32 kommt bei Xlib als Feld von `c_long`.
+            let result = (status == 0 && format == 32 && items >= 4).then(|| {
+                let values = std::slice::from_raw_parts(data.cast::<std::ffi::c_long>(), 4);
+                (values[0] as i32, values[2] as i32)
+            });
+            (x11.XFree)(data.cast());
+            result
+        }
     }
 }
 
@@ -3497,7 +3583,24 @@ fn apply_system_scheme() {
         && APPLIED.get() != Some(dark)
     {
         set_dark(&settings, Some(dark));
+        notify_scheme_watchers();
     }
+}
+
+thread_local! {
+    /// Wer von Wechseln zwischen Hell und Dunkel hören will.
+    static SCHEME_WATCHERS: RefCell<Vec<Box<dyn Fn()>>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Meldet den Wechsel, sobald GTK die neuen Farben übernommen hat.
+fn notify_scheme_watchers() {
+    glib::idle_add_local_once(|| {
+        SCHEME_WATCHERS.with(|w| {
+            for f in w.borrow().iter() {
+                f();
+            }
+        });
+    });
 }
 
 thread_local! {

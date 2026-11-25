@@ -75,6 +75,8 @@ pub(crate) trait Backend {
     fn timer_stop(id: u64);
     fn color_scheme() -> ColorScheme;
     fn set_color_scheme(scheme: ColorScheme) -> bool;
+    /// `f` nach jedem Wechsel zwischen Hell und Dunkel aufrufen.
+    fn watch_color_scheme(f: Box<dyn Fn()>);
     fn message(parent: Option<&Self::Native>, kind: MessageKind, title: &str, text: &str);
     fn confirm(parent: Option<&Self::Native>, title: &str, text: &str) -> bool;
     /// Fragt nach einer Textzeile (`secret`: verdeckt); `None`, wenn abgebrochen.
