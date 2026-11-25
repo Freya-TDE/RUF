@@ -1232,7 +1232,10 @@ impl Backend for Gtk {
                 let keep = (cfg!(all(unix, not(target_os = "macos"))) && window.is_mapped())
                     .then(|| pending.or_else(|| position::get(window)))
                     .flatten();
-                window.set_default_size(w.max(1), h.max(1));
+                // Größen meint RUF ohne Menüleiste (so meldet es sie auch): das
+                // Fenster ist um die Leiste höher. Sonst schrumpften Fenster mit
+                // Menü bei jedem Neustart um deren Höhe.
+                window.set_default_size(w.max(1), h.max(1) + menu_bar_height(window));
                 if let Some(p) = keep
                     && pending.is_none()
                 {
@@ -3000,6 +3003,16 @@ fn key_from(keyval: gdk::Key) -> Option<Key> {
     })
 }
 
+/// Höhe der Menüleiste eines Fensters (0 ohne Menü).
+fn menu_bar_height(window: &gtk::Window) -> i32 {
+    window
+        .child()
+        .and_then(|c| c.downcast::<gtk::Box>().ok())
+        .and_then(|column| column.first_child())
+        .filter(|c| c.is::<gtk::PopoverMenuBar>())
+        .map_or(0, |bar| bar.measure(gtk::Orientation::Vertical, -1).1)
+}
+
 /// CSS-Klassen der Registerkarte als Merker: Reiter mit „x“ bzw. ziehbar.
 const TABS_CLOSABLE: &str = "ruf-tabs-closable";
 const TABS_DETACHABLE: &str = "ruf-tabs-detachable";
@@ -3420,6 +3433,32 @@ mod position {
                 (x11.XFree)(hints.cast());
             }
             (x11.XMoveWindow)(display, xid, x, y);
+            // Zusätzlich wie eine Fensterliste (EWMH `_NET_MOVERESIZE_WINDOW`,
+            // Quelle „Pager“): KWin hält Fenster, die ein Programm verschiebt,
+            // in seiner X11-Arbeitsfläche – bei Bildschirmen mit verschiedener
+            // Höhe ein einziges Rechteck, unten auf den äußeren Bildschirmen zu
+            // knapp. Anfragen eines Pagers behandelt es wie Verschieben von Hand.
+            let atom = (x11.XInternAtom)(display, c"_NET_MOVERESIZE_WINDOW".as_ptr(), xlib::False);
+            if atom != 0 {
+                let mut event: xlib::XEvent = std::mem::zeroed();
+                event.client_message.type_ = xlib::ClientMessage;
+                event.client_message.window = xid;
+                event.client_message.message_type = atom;
+                event.client_message.format = 32;
+                // Schwerkraft Nordwest, x und y gültig, Quelle 2 (Pager).
+                let flags = 1 | (1 << 8) | (1 << 9) | (2 << 12);
+                let data = event.client_message.data.as_longs_mut();
+                data[0] = flags;
+                data[1] = x.into();
+                data[2] = y.into();
+                (x11.XSendEvent)(
+                    display,
+                    (x11.XDefaultRootWindow)(display),
+                    xlib::False,
+                    xlib::SubstructureRedirectMask | xlib::SubstructureNotifyMask,
+                    &mut event,
+                );
+            }
             (x11.XFlush)(display);
         }
         true
@@ -3452,6 +3491,15 @@ mod position {
         display: *mut xlib::Display,
         xid: xlib::Window,
     ) -> Option<(i32, i32)> {
+        frame_extents_all(x11, display, xid).map(|(left, _, top, _)| (left, top))
+    }
+
+    /// `_NET_FRAME_EXTENTS`: links, rechts, oben, unten.
+    fn frame_extents_all(
+        x11: &xlib::Xlib,
+        display: *mut xlib::Display,
+        xid: xlib::Window,
+    ) -> Option<(i32, i32, i32, i32)> {
         // SAFETY: gültige Verbindung und Fensterkennung; die gelieferten Daten
         // gehören Xlib und werden mit XFree freigegeben.
         unsafe {
@@ -3481,7 +3529,12 @@ mod position {
             // Format 32 kommt bei Xlib als Feld von `c_long`.
             let result = (status == 0 && format == 32 && items >= 4).then(|| {
                 let values = std::slice::from_raw_parts(data.cast::<std::ffi::c_long>(), 4);
-                (values[0] as i32, values[2] as i32)
+                (
+                    values[0] as i32,
+                    values[1] as i32,
+                    values[2] as i32,
+                    values[3] as i32,
+                )
             });
             (x11.XFree)(data.cast());
             result
