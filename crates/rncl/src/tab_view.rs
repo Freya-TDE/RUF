@@ -105,6 +105,17 @@ impl RnclTabView {
         self.widget.on_tab_detach_requested(f);
     }
 
+    /// Reiter lassen sich auf andere Reiter ziehen und so sortieren; `f` bekommt
+    /// alten und neuen Index, die Seite ist dann schon verschoben.
+    pub fn on_tab_moved(&self, f: impl FnMut(i32, i32) + 'static) {
+        self.widget.on_tab_moved(f);
+    }
+
+    /// Verschiebt die Seite `from` an die Stelle `to` (Reiter und Inhalt).
+    pub fn move_tab(&self, from: i32, to: i32) {
+        self.widget.move_tab(from, to);
+    }
+
     /// Wird beim Seitenwechsel mit dem neuen Index aufgerufen.
     pub fn on_current_index_changed(&self, f: impl FnMut(i32) + 'static) {
         self.widget.on_current_index_changed(f);

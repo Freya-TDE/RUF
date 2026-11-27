@@ -1084,6 +1084,23 @@ impl Widget {
         core::connect_tab_detach(self.id, f)
     }
 
+    /// Registerkarte: der Anwender hat den Reiter `from` auf den Reiter `to`
+    /// gezogen; die Seite ist beim Aufruf schon verschoben. Macht die Reiter
+    /// ziehbar.
+    pub fn on_tab_moved(&self, f: impl FnMut(i32, i32) + 'static) -> bool {
+        core::connect_tab_move(self.id, f)
+    }
+
+    /// Verschiebt die Seite `from` an die Stelle `to` (ohne `on_tab_moved`).
+    pub fn move_tab(&self, from: i32, to: i32) {
+        core::tab_move(self.id, from, to);
+    }
+
+    /// Simuliert das Ziehen des Reiters `from` auf den Reiter `to` (Tests).
+    pub fn simulate_tab_move(&self, from: i32, to: i32) {
+        core::notify(self.id, core::Notify::TabMove(from, to));
+    }
+
     /// Simuliert „x“ bzw. Mittelklick am Reiter `index` (Tests).
     pub fn simulate_tab_close(&self, index: i32) {
         core::notify(self.id, core::Notify::TabClose(index));

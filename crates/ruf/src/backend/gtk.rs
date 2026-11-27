@@ -1127,6 +1127,14 @@ impl Backend for Gtk {
                 notebook.set_scrollable(true);
                 notebook
                     .connect_notify_local(Some("page"), move |_, _| notify(id, Notify::Changed));
+                // Ein Reiter, der auf der Registerkarte selbst (nicht auf
+                // einem Reiter) landet, bleibt, wo er ist: kein Herauslösen.
+                let stay = gtk::DropTarget::new(TabDrag::static_type(), gdk::DragAction::MOVE);
+                stay.connect_drop(|_, _, _, _| {
+                    DROPPED_HERE.set(true);
+                    true
+                });
+                notebook.add_controller(stay);
                 (notebook.clone().upcast(), None, Inner::Tabs(notebook))
             }
             WidgetKind::ScrollArea => {
@@ -1815,6 +1823,20 @@ impl Backend for Gtk {
     fn tabs_set_detachable(native: &GtkNative, detachable: bool) {
         if let Inner::Tabs(n) = &native.inner {
             set_class(n.upcast_ref(), TABS_DETACHABLE, detachable);
+        }
+    }
+
+    fn tabs_set_reorderable(native: &GtkNative, reorderable: bool) {
+        if let Inner::Tabs(n) = &native.inner {
+            set_class(n.upcast_ref(), TABS_REORDERABLE, reorderable);
+        }
+    }
+
+    fn tab_move(native: &GtkNative, from: i32, to: i32) {
+        if let Inner::Tabs(n) = &native.inner
+            && let Some(page) = n.nth_page(u32::try_from(from).ok())
+        {
+            n.reorder_child(&page, u32::try_from(to).ok());
         }
     }
 
@@ -3016,6 +3038,7 @@ fn menu_bar_height(window: &gtk::Window) -> i32 {
 /// CSS-Klassen der Registerkarte als Merker: Reiter mit „x“ bzw. ziehbar.
 const TABS_CLOSABLE: &str = "ruf-tabs-closable";
 const TABS_DETACHABLE: &str = "ruf-tabs-detachable";
+const TABS_REORDERABLE: &str = "ruf-tabs-reorderable";
 
 fn set_class(widget: &gtk::Widget, class: &str, on: bool) {
     if on {
@@ -3026,7 +3049,8 @@ fn set_class(widget: &gtk::Widget, class: &str, on: bool) {
 }
 
 /// Reiter einer Seite: Titel und (je nach Registerkarte sichtbar) ein „x“.
-/// Mittelklick schließt wie das „x“; ins Leere gezogen meldet `TabDetach`.
+/// Mittelklick schließt wie das „x“; ins Leere gezogen meldet `TabDetach`,
+/// auf einen anderen Reiter gezogen `TabMove`.
 /// Der Index wird erst beim Ereignis bestimmt (Seiten können wandern).
 fn tab_label(notebook: &gtk::Notebook, id: Id, page: &gtk::Widget, title: &str) -> gtk::Box {
     let tab = gtk::Box::new(gtk::Orientation::Horizontal, 4);
@@ -3067,14 +3091,18 @@ fn tab_label(notebook: &gtk::Notebook, id: Id, page: &gtk::Widget, title: &str) 
         }
     });
     tab.add_controller(middle);
-    // Herausziehen: nur, wenn die Registerkarte es erlaubt.
+    // Ziehen: nur, wenn die Registerkarte Herauslösen oder Sortieren erlaubt.
+    // Eigener Typ (`TabDrag`), damit Ablageziele für Text (z. B. der Griff
+    // eines herausgelösten Fensters) den Reiter nicht abfangen und umgekehrt.
     let source = gtk::DragSource::new();
-    source.set_actions(gdk::DragAction::COPY);
-    let n = notebook.downgrade();
+    source.set_actions(gdk::DragAction::MOVE);
+    let (n, p) = (notebook.downgrade(), page.downgrade());
     source.connect_prepare(move |_, _, _| {
-        n.upgrade()
-            .filter(|n| n.has_css_class(TABS_DETACHABLE))
-            .map(|_| gdk::ContentProvider::for_value(&DragText("ruf-tab".into()).to_value()))
+        let notebook = n
+            .upgrade()
+            .filter(|n| n.has_css_class(TABS_DETACHABLE) || n.has_css_class(TABS_REORDERABLE))?;
+        DRAGGED_TAB.set(Some((notebook.downgrade(), p.clone())));
+        Some(gdk::ContentProvider::for_value(&TabDrag.to_value()))
     });
     source.connect_drag_begin(|source, _| {
         if let Some(w) = source.widget() {
@@ -3082,15 +3110,49 @@ fn tab_label(notebook: &gtk::Notebook, id: Id, page: &gtk::Widget, title: &str) 
             source.set_icon(Some(&image), w.width() / 2, w.height() / 2);
         }
     });
-    let i = index_of;
+    let i = index_of.clone();
+    let n = notebook.downgrade();
     watch_drag_end(&source, move || {
-        if let Some(index) = i() {
+        let detachable = n
+            .upgrade()
+            .is_some_and(|n| n.has_css_class(TABS_DETACHABLE));
+        if detachable && let Some(index) = i() {
             notify(id, Notify::TabDetach(index));
         }
     });
     tab.add_controller(source);
+    // Auf diesen Reiter abgelegt: der gezogene Reiter nimmt seinen Platz ein.
+    let target = gtk::DropTarget::new(TabDrag::static_type(), gdk::DragAction::MOVE);
+    let n = notebook.downgrade();
+    target.connect_drop(move |_, _, _, _| {
+        DROPPED_HERE.set(true);
+        let dragged = DRAGGED_TAB.take();
+        let Some(notebook) = n.upgrade() else {
+            return true;
+        };
+        if !notebook.has_css_class(TABS_REORDERABLE) {
+            return true;
+        }
+        let from = dragged
+            .filter(|(nb, _)| nb.upgrade().as_ref() == Some(&notebook))
+            .and_then(|(_, page)| page.upgrade())
+            .and_then(|page| notebook.page_num(&page));
+        if let (Some(from), Some(to)) = (from, index_of()) {
+            let from = from as i32;
+            if from != to {
+                notify(id, Notify::TabMove(from, to));
+            }
+        }
+        true
+    });
+    tab.add_controller(target);
     tab
 }
+
+/// Inhalt beim Ziehen eines Reiters (nur innerhalb des Programms bekannt).
+#[derive(Clone, Debug, glib::Boxed)]
+#[boxed_type(name = "RufTabDrag")]
+struct TabDrag;
 
 /// Inhalt eines Ziehens aus einem Widget mit `set_drag_text` (nur innerhalb
 /// des Programms bekannt, siehe dort).
@@ -3103,6 +3165,9 @@ thread_local! {
     static DROPPED_HERE: Cell<bool> = const { Cell::new(false) };
     /// Mit Esc abgebrochen (dann gilt es nicht als „ins Leere gezogen“).
     static DRAG_ABORTED: Cell<bool> = const { Cell::new(false) };
+    /// Der gerade gezogene Reiter: Registerkarte und Seite.
+    static DRAGGED_TAB: std::cell::RefCell<Option<(glib::WeakRef<gtk::Notebook>, glib::WeakRef<gtk::Widget>)>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// Ruft `outside`, wenn ein Ziehen aus `source` endet, ohne in einem eigenen
@@ -3114,13 +3179,20 @@ fn watch_drag_end(source: &gtk::DragSource, outside: impl Fn() + 'static) {
         DROPPED_HERE.set(false);
         DRAG_ABORTED.set(false);
     });
+    // `true`: erledigt, ohne die Animation, die das Ziehbild zum Start
+    // zurückfahren lässt. Ins Leere ziehen ist hier gewollt (eigenes Fenster),
+    // und unter Windows 11 blieb das Bild dieser Animation als Fenster auf dem
+    // Bildschirm stehen, über allen Programmen.
     source.connect_drag_cancel(|_, _, reason| {
         if reason == gdk::DragCancelReason::UserCancelled {
             DRAG_ABORTED.set(true);
         }
-        false
+        true
     });
-    source.connect_drag_end(move |_, _, _| {
+    source.connect_drag_end(move |_, drag, _| {
+        // Das Ziehbild ausdrücklich verstecken (siehe oben, Windows 11).
+        gtk::DragIcon::for_drag(drag).set_visible(false);
+        DRAGGED_TAB.set(None);
         if !DROPPED_HERE.get() && !DRAG_ABORTED.get() {
             outside();
         }

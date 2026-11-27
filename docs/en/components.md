@@ -428,6 +428,17 @@ tabs.remove_tab(1);                               // removes the page and its co
 | `tabs` | List | page titles (setting renames, adds or removes pages) |
 | `current_index` | Int | visible page |
 
+Tabs to close, drag out and reorder (each switched on as soon as a handler is set):
+
+```rust
+tabs.on_tab_close_requested(|i| println!("close page {i}?"));    // "x", middle click
+tabs.on_tab_detach_requested(|i| println!("page {i} dragged into nowhere"));
+tabs.on_tab_moved(|from, to| println!("page {from} now at {to}")); // dropped on a tab
+tabs.move_tab(0, 2);                              // without on_tab_moved
+```
+
+When reordering, the page and its content have already moved when `on_tab_moved` runs.
+
 ## `RnclScrollView` – scroll area
 
 Native: GTK `GtkScrolledWindow` · container (content) · category *Container*

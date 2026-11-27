@@ -430,6 +430,18 @@ tabs.remove_tab(1);                                // entfernt Seite samt Inhalt
 | `tabs` | Liste | Seitentitel (Setzen benennt um, ergänzt bzw. entfernt Seiten) |
 | `current_index` | Int | sichtbare Seite |
 
+Reiter zum Schließen, Herausziehen und Sortieren (jeweils eingeschaltet, sobald ein
+Handler gesetzt ist):
+
+```rust
+tabs.on_tab_close_requested(|i| println!("Seite {i} schließen?"));  // „x“, Mittelklick
+tabs.on_tab_detach_requested(|i| println!("Seite {i} ins Leere gezogen"));
+tabs.on_tab_moved(|from, to| println!("Seite {from} jetzt an {to}")); // auf einen Reiter gezogen
+tabs.move_tab(0, 2);                               // ohne on_tab_moved
+```
+
+Beim Sortieren ist die Seite samt Inhalt schon verschoben, wenn `on_tab_moved` läuft.
+
 ## `RnclScrollView` – Scrollbereich
 
 Nativ: GTK `GtkScrolledWindow` · Container (Inhalt) · Kategorie *Container*

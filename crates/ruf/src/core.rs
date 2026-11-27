@@ -145,6 +145,9 @@ pub(crate) enum Notify {
     TabClose(i32),
     /// Registerkarte: Seite `n` wurde aus der Leiste ins Leere gezogen.
     TabDetach(i32),
+    /// Registerkarte: Seite `von` wurde auf den Reiter `nach` gezogen; der Kern
+    /// verschiebt sie und meldet es danach.
+    TabMove(i32, i32),
 }
 
 type Callback<F> = Rc<RefCell<F>>;
@@ -172,6 +175,7 @@ enum Handler {
     DragCancelled(Callback<dyn FnMut()>),
     TabClose(Callback<dyn FnMut(i32)>),
     TabDetach(Callback<dyn FnMut(i32)>),
+    TabMove(Callback<dyn FnMut(i32, i32)>),
 }
 
 /// Ein Signal, das ein Widget anbieten kann.
@@ -198,6 +202,7 @@ pub(crate) enum Signal {
     DragCancelled,
     TabClose,
     TabDetach,
+    TabMove,
 }
 
 impl Signal {
@@ -231,7 +236,7 @@ impl Signal {
             Signal::Gutter => kind == K::CodeEditor,
             Signal::Drop => matches!(kind, K::Canvas | K::Window | K::Container | K::TabView),
             Signal::ContextMenu | Signal::DragCancelled => true,
-            Signal::TabClose | Signal::TabDetach => kind == K::TabView,
+            Signal::TabClose | Signal::TabDetach | Signal::TabMove => kind == K::TabView,
         }
     }
 }
@@ -1047,6 +1052,17 @@ pub(crate) fn notify(id: Id, event: Notify) {
             }),
             |f| f(index),
         ),
+        Notify::TabMove(from, to) => {
+            if tab_move(id, from, to) {
+                fire(
+                    handlers(id, |h| match h {
+                        Handler::TabMove(f) => Some(f.clone()),
+                        _ => None,
+                    }),
+                    |f| f(from, to),
+                );
+            }
+        }
         Notify::ContextMenu(x, y) => fire(
             handlers(id, |h| match h {
                 Handler::ContextMenu(f) => Some(f.clone()),
@@ -1365,6 +1381,29 @@ pub(crate) fn tab_remove(id: Id, index: i32) {
     sync(id);
 }
 
+/// Verschiebt die Seite `from` an die Stelle `to` (Reiter und Inhalt); liefert,
+/// ob sich etwas geändert hat.
+pub(crate) fn tab_move(id: Id, from: i32, to: i32) -> bool {
+    let Some((native, count)) = get(id, |n| (n.native.clone(), n.tabs.len())) else {
+        return false;
+    };
+    let (Ok(f), Ok(t)) = (usize::try_from(from), usize::try_from(to)) else {
+        return false;
+    };
+    if f >= count || t >= count || f == t {
+        return false;
+    }
+    update(id, |n| {
+        let page = n.tabs.remove(f);
+        n.tabs.insert(t, page);
+        let title = n.tab_titles.remove(f);
+        n.tab_titles.insert(t, title);
+    });
+    setter(|| Platform::tab_move(&native, from, to));
+    sync(id);
+    true
+}
+
 pub(crate) fn tab_set_title(id: Id, index: i32, title: &str) {
     let Some(native) = get(id, |n| n.native.clone()) else {
         return;
@@ -1571,6 +1610,20 @@ pub(crate) fn connect_tab_close(id: Id, f: impl FnMut(i32) + 'static) -> bool {
     );
     if added && let Some((native, _)) = native(id) {
         setter(|| Platform::tabs_set_closable(&native, true));
+    }
+    added
+}
+
+/// Registerkarte: Reiter auf einen anderen gezogen (Reihenfolge geändert);
+/// macht die Reiter ziehbar.
+pub(crate) fn connect_tab_move(id: Id, f: impl FnMut(i32, i32) + 'static) -> bool {
+    let added = add_handler(
+        id,
+        Signal::TabMove,
+        Handler::TabMove(Rc::new(RefCell::new(f))),
+    );
+    if added && let Some((native, _)) = native(id) {
+        setter(|| Platform::tabs_set_reorderable(&native, true));
     }
     added
 }

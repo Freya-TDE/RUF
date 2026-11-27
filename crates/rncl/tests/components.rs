@@ -423,6 +423,21 @@ fn tab_view() {
     assert!(!check.widget().is_alive());
     assert!(!page2.widget().is_alive());
 
+    // Sortieren: Seite samt Inhalt wandert, gemeldet nur beim Ziehen.
+    tabs.set_tab_titles(&["Basis", "Profi", "Neu"]);
+    let moved = Rc::new(Cell::new((-1, -1)));
+    let m = moved.clone();
+    tabs.on_tab_moved(move |from, to| m.set((from, to)));
+    tabs.move_tab(0, 2);
+    assert_eq!(tabs.tab_titles(), ["Profi", "Neu", "Basis"]);
+    assert_eq!(moved.get(), (-1, -1));
+    tabs.widget().simulate_tab_move(2, 0);
+    assert_eq!(tabs.tab_titles(), ["Basis", "Profi", "Neu"]);
+    assert_eq!(moved.get(), (2, 0));
+    tabs.widget().simulate_tab_move(1, 1);
+    assert_eq!(moved.get(), (2, 0), "no move, no signal");
+    tabs.set_tab_titles(&["Basis"]);
+
     // add_tab auf einem Nicht-Tab-Widget liefert ein totes Widget statt einer Panik.
     assert!(!window.widget().add_tab("x").is_alive());
 }
@@ -528,6 +543,25 @@ fn resize_and_shortcut() {
     window.set_size(333, 222);
     Application::process_events();
     assert_eq!(size.get(), (333, 222));
+
+    // Größe vor dem Anzeigen, mit Menü: der Inhalt bekommt sie ganz, auch wenn
+    // GTK die Titelleiste selbst zeichnet (Windows, GNOME; hier mit GTK_CSD=1).
+    let framed = RnclWindow::new("framed");
+    framed.set_menu_bar(vec![(
+        "Datei".into(),
+        ruf::Menu::new().item("x", "X", None),
+    )]);
+    let inner = Rc::new(Cell::new((0, 0)));
+    let i = inner.clone();
+    framed.on_resized(move |w, h| i.set((w, h)));
+    framed.set_size(320, 180);
+    framed.show();
+    assert!(
+        wait_until(|| inner.get() == (320, 180)),
+        "{:?}",
+        inner.get()
+    );
+    framed.close();
 
     let allow = Rc::new(Cell::new(false));
     let a = allow.clone();

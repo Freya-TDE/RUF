@@ -175,6 +175,11 @@ pub(crate) trait Backend {
     fn tabs_set_closable(native: &Self::Native, closable: bool);
     /// Reiter lassen sich ins Leere ziehen, gemeldet als `Notify::TabDetach`.
     fn tabs_set_detachable(native: &Self::Native, detachable: bool);
+    /// Reiter lassen sich auf andere Reiter ziehen, gemeldet als
+    /// `Notify::TabMove` (verschoben wird erst über [`Backend::tab_move`]).
+    fn tabs_set_reorderable(native: &Self::Native, reorderable: bool);
+    /// Verschiebt die Seite `from` an die Stelle `to`.
+    fn tab_move(native: &Self::Native, from: i32, to: i32);
 
     // --- Wertebereich (Spinbox, Schieberegler, Fortschritt) ----------------------
 
