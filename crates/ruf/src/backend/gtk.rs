@@ -94,9 +94,12 @@ mod imp {
                 };
                 child.size_allocate(&gtk::Allocation::new(*x, *y, w, h), -1);
             }
+            let id = self.id.get();
+            if let Some(requested) = REQUESTED_SIZES.with(|r| r.borrow_mut().remove(&id)) {
+                learn_size_offset(&self.obj(), id, requested, (width, height));
+            }
             if self.last.replace((width, height)) != (width, height) {
                 // Nicht während der Größenverteilung umbauen: erst danach melden.
-                let id = self.id.get();
                 glib::idle_add_local_once(move || {
                     core::notify(id, Notify::Resized(Size::new(width, height)));
                 });
@@ -273,6 +276,12 @@ thread_local! {
     static PENDING_POSITIONS: RefCell<HashMap<Id, (i32, i32)>> = RefCell::new(HashMap::new());
     /// Lage sichtbarer Fenster vor einer Größenänderung, bis sie geprüft ist.
     static KEEP_POSITIONS: RefCell<HashMap<Id, Point>> = RefCell::new(HashMap::new());
+    /// Angeforderte Inhaltsgröße eines noch nicht sichtbaren Fensters, bis die
+    /// erste Zuteilung danach geprüft ist (siehe [`size_offset`]).
+    static REQUESTED_SIZES: RefCell<HashMap<Id, (i32, i32)>> = RefCell::new(HashMap::new());
+    /// Gelernter Versatz je Fenster: so viel mehr fordert RUF an, damit der
+    /// Inhalt die gewünschte Größe bekommt.
+    static SIZE_OFFSETS: RefCell<HashMap<Id, (i32, i32)>> = RefCell::new(HashMap::new());
     static RADIO_GROUPS: RefCell<Vec<(glib::WeakRef<gtk::Widget>, glib::WeakRef<gtk::CheckButton>)>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -1243,7 +1252,16 @@ impl Backend for Gtk {
                 // Größen meint RUF ohne Menüleiste (so meldet es sie auch): das
                 // Fenster ist um die Leiste höher. Sonst schrumpften Fenster mit
                 // Menü bei jedem Neustart um deren Höhe.
-                window.set_default_size(w.max(1), h.max(1) + menu_bar_height(window));
+                // Windows: der Inhalt kam um die Titelleiste niedriger heraus als
+                // angefordert; den bei der ersten Zuteilung gelernten Versatz
+                // aufschlagen (siehe `size_offset`).
+                let (w, h) = (w.max(1), h.max(1));
+                if LEARN_SIZE_OFFSETS && !window.is_mapped() {
+                    REQUESTED_SIZES.with(|r| r.borrow_mut().insert(id, (w, h)));
+                }
+                let (dw, dh) =
+                    SIZE_OFFSETS.with(|o| o.borrow().get(&id).copied().unwrap_or_default());
+                window.set_default_size(w + dw, h + dh + menu_bar_height(window));
                 if let Some(p) = keep
                     && pending.is_none()
                 {
@@ -3026,6 +3044,55 @@ fn key_from(keyval: gdk::Key) -> Option<Key> {
 }
 
 /// Höhe der Menüleiste eines Fensters (0 ohne Menü).
+/// Nur Windows und macOS lernen einen Versatz: unter Windows 10/11 kam der
+/// Inhalt jedes Fensters 39 px (Titelleiste) niedriger heraus, als RUF per
+/// `set_default_size` anforderte – bei jedem Start schrumpften Fenster, das
+/// Hauptfenster von Freya TDE war abgeschnitten. Unter Linux stimmt die
+/// Größe; dort würde ein Kachel-Fenstermanager einen falschen Versatz lehren.
+const LEARN_SIZE_OFFSETS: bool = cfg!(any(target_os = "windows", target_os = "macos"));
+
+/// Größter Versatz, der als Abweichung des Toolkits gilt (größere Unterschiede
+/// hat der Fenstermanager entschieden, z. B. ein zu kleiner Bildschirm).
+const MAX_SIZE_OFFSET: i32 = 100;
+
+/// Versatz zwischen angeforderter und erster zugeteilter Inhaltsgröße: je
+/// Achse, nur wenn der Inhalt kleiner ausfiel, höchstens [`MAX_SIZE_OFFSET`].
+fn size_offset(requested: (i32, i32), got: (i32, i32)) -> (i32, i32) {
+    let axis = |want: i32, have: i32| {
+        let d = want - have;
+        if (1..=MAX_SIZE_OFFSET).contains(&d) {
+            d
+        } else {
+            0
+        }
+    };
+    (axis(requested.0, got.0), axis(requested.1, got.1))
+}
+
+/// Erste Zuteilung eines Fensters nach einer Größenanforderung vor dem
+/// Erscheinen: fiel der Inhalt kleiner aus, den Versatz merken und die Größe
+/// mit ihm noch einmal anfordern.
+fn learn_size_offset(content: &RufFixed, id: Id, requested: (i32, i32), got: (i32, i32)) {
+    let offset = size_offset(requested, got);
+    if offset == (0, 0) {
+        return;
+    }
+    let Some(window) = content.root().and_downcast::<gtk::Window>() else {
+        return;
+    };
+    if window.is_maximized() || window.is_fullscreen() {
+        return;
+    }
+    SIZE_OFFSETS.with(|o| o.borrow_mut().insert(id, offset));
+    // Nicht während der Größenverteilung ändern.
+    glib::idle_add_local_once(move || {
+        window.set_default_size(
+            requested.0 + offset.0,
+            requested.1 + offset.1 + menu_bar_height(&window),
+        );
+    });
+}
+
 fn menu_bar_height(window: &gtk::Window) -> i32 {
     window
         .child()
@@ -4623,7 +4690,22 @@ fn replace_word_before_cursor(view: &sourceview5::View, text: &str) {
 
 #[cfg(test)]
 mod tone_tests {
-    use super::apply_tone;
+    use super::{MAX_SIZE_OFFSET, apply_tone, size_offset};
+
+    #[test]
+    fn size_offset_only_for_smaller_content() {
+        // Windows 10/11: 39 px Titelleiste fehlten in der Höhe.
+        assert_eq!(size_offset((1310, 426), (1310, 387)), (0, 39));
+        assert_eq!(size_offset((800, 600), (800, 600)), (0, 0));
+        // Größer als angefordert (Mindestgröße des Inhalts): nichts lernen.
+        assert_eq!(size_offset((300, 100), (320, 152)), (0, 0));
+        // Sehr viel kleiner hat der Fenstermanager entschieden (Bildschirm).
+        assert_eq!(size_offset((800, 3000), (800, 1000)), (0, 0));
+        assert_eq!(
+            size_offset((800, 600), (800, 600 - MAX_SIZE_OFFSET)),
+            (0, MAX_SIZE_OFFSET)
+        );
+    }
 
     #[test]
     fn gamma_and_opacity_on_premultiplied_pixels() {
