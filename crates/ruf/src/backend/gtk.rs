@@ -95,6 +95,13 @@ mod imp {
                 child.size_allocate(&gtk::Allocation::new(*x, *y, w, h), -1);
             }
             let id = self.id.get();
+            // Windows: solange ein Menü der Menüleiste offen ist, bekommt die Leiste mehr
+            // Höhe und der Inhalt weniger. Diese Größe nicht melden – sonst merkte sich das
+            // Programm die kleinere Höhe (Beenden über das Menü speicherte sie) und ließe
+            // das Fenster auf seine Mindesthöhe nachwachsen.
+            if menu_open(&self.obj()) {
+                return;
+            }
             if let Some(requested) = REQUESTED_SIZES.with(|r| r.borrow_mut().remove(&id)) {
                 learn_size_offset(&self.obj(), id, requested, (width, height));
             }
@@ -3091,6 +3098,27 @@ fn learn_size_offset(content: &RufFixed, id: Id, requested: (i32, i32), got: (i3
             requested.1 + offset.1 + menu_bar_height(&window),
         );
     });
+}
+
+/// Is a menu of the window's menu bar open? `content` is the window's own
+/// container (below the menu bar in the same column).
+fn menu_open(content: &RufFixed) -> bool {
+    fn visible_popover(widget: &gtk::Widget) -> bool {
+        let mut child = widget.first_child();
+        while let Some(c) = child {
+            if (c.is::<gtk::Popover>() && c.is_visible()) || visible_popover(&c) {
+                return true;
+            }
+            child = c.next_sibling();
+        }
+        false
+    }
+    content
+        .parent()
+        .and_downcast::<gtk::Box>()
+        .and_then(|column| column.first_child())
+        .filter(|bar| bar.is::<gtk::PopoverMenuBar>())
+        .is_some_and(|bar| visible_popover(&bar))
 }
 
 fn menu_bar_height(window: &gtk::Window) -> i32 {
