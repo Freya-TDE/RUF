@@ -15,7 +15,7 @@
 |---|---|---|
 | `ruf: Vor dem ersten Widget muss eine ruf::Application erzeugt werden` | component created before `Application::new()` | create the `Application` first |
 | `ruf: Es darf nur eine Application pro Prozess existieren` | second `Application` | one instance per process; in tests use an own `main()` (`harness = false`) |
-| `ruf: GTK konnte nicht initialisiert werden` | Linux without a graphical session | `xvfb-run -a …`; under Wayland also `GDK_BACKEND=x11` |
+| `ruf: GTK could not be initialised` | Linux without a graphical session | `xvfb-run -a …`; under Wayland also `GDK_BACKEND=x11` |
 | window does not appear | `RnclWindow` was dropped | keep the window variable alive until `exec()` |
 | widget does not get smaller (Linux) | GTK never goes below the natural size | shorten text, use wrapping (`set_word_wrap`) or allow more space |
 | `on_resized` reports later (Linux) | GTK distributes sizes via its frame clock | call `Application::process_events()` after `show()` |

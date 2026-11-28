@@ -606,8 +606,8 @@ impl Backend for Gtk {
         }
         if let Err(e) = gtk::init() {
             panic!(
-                "ruf: GTK konnte nicht initialisiert werden ({e}). Läuft eine grafische \
-                 Sitzung? Ohne Bildschirm z. B. mit `xvfb-run` starten."
+                "ruf: GTK could not be initialised ({e}). Is a graphical session running? \
+                 Without a screen, start e.g. with `xvfb-run`."
             );
         }
         quiet_frame_timing_warnings();
